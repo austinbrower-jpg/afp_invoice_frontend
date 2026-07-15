@@ -1,0 +1,24 @@
+# deps
+node_modules/
+
+# next
+.next/
+out/
+build/
+
+# env
+.env
+.env.local
+.env*.local
+
+# vercel
+.vercel
+
+# macOS
+.DS_Store
+._*
+__MACOSX/
+
+# editor
+.idea/
+*.swp

@@ -1,0 +1,533 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AFP Invoice Builder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --graphite:#15171c;
+    --panel:#1d2027;
+    --panel-2:#242832;
+    --line:#31363f;
+    --text:#e6e8ec;
+    --dim:#8b929e;
+    --accent:#6366f1;
+    --amber:#d9a441;
+    --paper:#ffffff;
+    --ink:#14161a;
+    --ink-dim:#5d636d;
+    --rule:#d7dae0;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:var(--graphite);
+    color:var(--text);
+    font-family:"Instrument Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    font-size:14px;
+    -webkit-font-smoothing:antialiased;
+  }
+  .mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums}
+
+  /* ---------- top bar ---------- */
+  .topbar{
+    position:sticky;top:0;z-index:20;
+    display:flex;align-items:center;gap:20px;flex-wrap:wrap;
+    padding:14px 22px;
+    background:rgba(21,23,28,.92);
+    backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--line);
+  }
+  .brand{display:flex;align-items:baseline;gap:10px}
+  .brand b{font-size:15px;font-weight:600;letter-spacing:-.01em}
+  .brand span{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--dim);letter-spacing:.14em;text-transform:uppercase}
+  .rangebox{display:flex;align-items:center;gap:8px;margin-left:auto}
+  .rangebox label{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--dim);letter-spacing:.1em;text-transform:uppercase}
+  input[type=date],input[type=text],select{
+    background:var(--panel-2);border:1px solid var(--line);color:var(--text);
+    border-radius:6px;padding:6px 8px;font-size:13px;font-family:inherit;
+  }
+  input[type=date]{font-family:"IBM Plex Mono",monospace;font-size:12px;color-scheme:dark}
+  input:focus,select:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+  .chips{display:flex;gap:6px}
+  .chip{
+    background:transparent;border:1px solid var(--line);color:var(--dim);
+    font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.04em;
+    padding:6px 10px;border-radius:999px;cursor:pointer;
+  }
+  .chip:hover{border-color:var(--accent);color:var(--text)}
+  .print-btn{
+    background:var(--accent);border:0;color:#fff;font-family:inherit;font-weight:600;font-size:13px;
+    padding:9px 18px;border-radius:6px;cursor:pointer;
+  }
+  .print-btn:hover{filter:brightness(1.12)}
+
+  /* ---------- layout ---------- */
+  .stage{display:grid;grid-template-columns:400px 1fr;gap:0;align-items:start}
+  @media (max-width:1100px){.stage{grid-template-columns:1fr}}
+
+  .rail{
+    border-right:1px solid var(--line);
+    height:calc(100vh - 59px);overflow-y:auto;
+    padding:18px 16px 60px;
+  }
+  .rail h2{
+    font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:500;color:var(--dim);
+    letter-spacing:.16em;text-transform:uppercase;margin-bottom:12px;
+  }
+  .rail h2 + h2{margin-top:26px}
+
+  /* ---------- ledger ---------- */
+  .day{margin-bottom:14px}
+  .day-head{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:0 2px 6px;border-bottom:1px solid var(--line);margin-bottom:6px;
+  }
+  .day-head .d{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--text);letter-spacing:.02em}
+  .day-head .h{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--dim)}
+
+  .sess{
+    display:grid;grid-template-columns:20px 1fr auto;gap:10px;align-items:start;
+    padding:9px 8px;border-radius:7px;cursor:pointer;
+    border:1px solid transparent;
+  }
+  .sess:hover{background:var(--panel)}
+  .sess.on{background:var(--panel);border-color:#3d4250}
+  .sess.locked{opacity:.42}
+  .sess input{margin-top:2px;accent-color:var(--accent);width:14px;height:14px;cursor:pointer}
+  .sess .sid{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--text);word-break:break-all}
+  .sess .meta{font-size:11px;color:var(--dim);margin-top:3px;line-height:1.45}
+  .sess .amt{text-align:right;font-family:"IBM Plex Mono",monospace;font-size:11px;line-height:1.5}
+  .sess .amt b{display:block;font-weight:500;color:var(--text)}
+  .sess .amt span{color:var(--dim)}
+  .tag{
+    display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:9px;letter-spacing:.08em;
+    text-transform:uppercase;padding:1px 5px;border-radius:3px;border:1px solid var(--line);
+    color:var(--dim);margin-right:4px;
+  }
+  .tag.invoiced{border-color:#3a5f4a;color:#7dc79a}
+  .tag.ready{border-color:#4a4f7a;color:#9ea6f5}
+  .tag.nobill{border-color:#6b4a4a;color:#e08b8b}
+
+  .runner{
+    position:sticky;bottom:0;margin-top:14px;
+    background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:12px 14px;
+  }
+  .runner .row{display:flex;justify-content:space-between;align-items:baseline;font-family:"IBM Plex Mono",monospace;font-size:12px}
+  .runner .row + .row{margin-top:6px;padding-top:8px;border-top:1px solid var(--line)}
+  .runner .row span{color:var(--dim);font-size:10px;letter-spacing:.1em;text-transform:uppercase}
+  .runner .row b{font-weight:500}
+  .runner .row.total b{font-size:18px;color:var(--accent)}
+
+  /* ---------- options ---------- */
+  .opt{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .opt.full{grid-template-columns:1fr}
+  .field{display:flex;flex-direction:column;gap:5px;margin-bottom:10px}
+  .field label{font-family:"IBM Plex Mono",monospace;font-size:9px;color:var(--dim);letter-spacing:.1em;text-transform:uppercase}
+  .toggle{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--dim);cursor:pointer;padding:5px 0}
+  .toggle input{accent-color:var(--accent);width:14px;height:14px}
+
+  .flags{border:1px solid #4a3f2a;background:#241f16;border-radius:8px;padding:11px 13px}
+  .flags p{font-size:11.5px;line-height:1.55;color:#d9c9a8;display:flex;gap:7px}
+  .flags p + p{margin-top:7px}
+  .flags p::before{content:"!";font-family:"IBM Plex Mono",monospace;color:var(--amber);font-weight:600;flex-shrink:0}
+
+  /* ---------- paper ---------- */
+  .paperstage{padding:34px;display:flex;justify-content:center;height:calc(100vh - 59px);overflow-y:auto}
+  .paper{
+    width:8.5in;min-height:11in;background:var(--paper);color:var(--ink);
+    padding:.62in .68in;box-shadow:0 1px 3px rgba(0,0,0,.4),0 22px 60px rgba(0,0,0,.5);
+    font-size:9.6pt;line-height:1.5;flex-shrink:0;
+  }
+  [contenteditable]{outline:0}
+  [contenteditable]:hover{background:#eef0fb;border-radius:2px}
+  [contenteditable]:focus{background:#e8ebfa;border-radius:2px}
+
+  .inv-head{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:16px;border-bottom:2px solid var(--ink)}
+  .inv-head h1{font-size:23pt;font-weight:700;letter-spacing:-.02em;line-height:1}
+  .inv-head .sub{font-family:"IBM Plex Mono",monospace;font-size:8pt;color:var(--ink-dim);letter-spacing:.16em;text-transform:uppercase;margin-top:7px}
+  .inv-no{text-align:right;font-family:"IBM Plex Mono",monospace}
+  .inv-no .n{font-size:13pt;font-weight:600}
+  .inv-no .dates{font-size:8pt;color:var(--ink-dim);margin-top:6px;line-height:1.7}
+
+  .parties{display:grid;grid-template-columns:1fr 1fr;gap:34px;padding:18px 0}
+  .parties .k{font-family:"IBM Plex Mono",monospace;font-size:7.5pt;color:var(--ink-dim);letter-spacing:.14em;text-transform:uppercase;margin-bottom:5px}
+  .parties .v{font-size:9.6pt;line-height:1.6;white-space:pre-line}
+  .parties .v strong{font-weight:600}
+
+  .period{
+    background:#f3f4f7;border-left:2px solid var(--accent);
+    padding:9px 12px;margin-bottom:16px;
+    font-family:"IBM Plex Mono",monospace;font-size:8.5pt;
+    display:flex;justify-content:space-between;
+  }
+  .period span{color:var(--ink-dim)}
+
+  table.items{width:100%;border-collapse:collapse;margin-bottom:6px}
+  table.items th{
+    font-family:"IBM Plex Mono",monospace;font-size:7.5pt;font-weight:500;color:var(--ink-dim);
+    letter-spacing:.11em;text-transform:uppercase;text-align:left;
+    padding:0 0 6px;border-bottom:1px solid var(--ink);
+  }
+  table.items td{padding:8px 0;border-bottom:1px solid var(--rule);vertical-align:top}
+  table.items .r{text-align:right;font-family:"IBM Plex Mono",monospace;font-size:9pt;white-space:nowrap}
+  table.items .date-c{font-family:"IBM Plex Mono",monospace;font-size:9pt;white-space:nowrap;width:74px}
+  table.items .desc b{font-weight:600;display:block}
+  table.items .desc small{color:var(--ink-dim);font-family:"IBM Plex Mono",monospace;font-size:7.8pt;letter-spacing:.02em}
+
+  .totals{display:flex;justify-content:flex-end;margin-top:14px}
+  .totals table{border-collapse:collapse;min-width:262px}
+  .totals td{padding:5px 0;font-family:"IBM Plex Mono",monospace;font-size:9pt}
+  .totals td:first-child{color:var(--ink-dim);padding-right:26px}
+  .totals td:last-child{text-align:right}
+  .totals tr.grand td{border-top:2px solid var(--ink);padding-top:9px;font-size:14pt;font-weight:600}
+  .totals tr.grand td:first-child{font-size:8pt;letter-spacing:.12em;text-transform:uppercase;color:var(--ink)}
+
+  .detail{margin-top:30px;padding-top:16px;border-top:1px solid var(--rule);break-inside:auto}
+  .detail > h3{font-family:"IBM Plex Mono",monospace;font-size:8pt;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:14px}
+  .entry{margin-bottom:16px;break-inside:avoid}
+  .entry h4{font-size:10pt;font-weight:600;margin-bottom:4px}
+  .entry .stamp{font-family:"IBM Plex Mono",monospace;font-size:7.5pt;color:var(--ink-dim);margin-bottom:6px;letter-spacing:.03em}
+  .entry p{font-size:9.2pt;line-height:1.62;white-space:pre-line}
+
+  .foot{margin-top:32px;padding-top:12px;border-top:1px solid var(--rule);display:flex;justify-content:space-between;font-family:"IBM Plex Mono",monospace;font-size:7.5pt;color:var(--ink-dim)}
+
+  .empty{padding:70px 20px;text-align:center;color:var(--ink-dim);font-size:10pt}
+
+  /* ---------- print ---------- */
+  @page{size:letter;margin:.5in}
+  @media print{
+    body{background:#fff}
+    .topbar,.rail{display:none !important}
+    .stage{display:block}
+    .paperstage{padding:0;display:block;height:auto;overflow:visible}
+    .paper{width:100%;min-height:0;box-shadow:none;padding:0}
+    [contenteditable]:hover,[contenteditable]:focus{background:transparent}
+    .entry{break-inside:avoid}
+    .detail > h3{break-after:avoid}
+  }
+  @media (prefers-reduced-motion:reduce){*{transition:none !important;animation:none !important}}
+</style>
+
+<div class="topbar">
+  <div class="brand"><b>Invoice Builder</b><span>Anytime Fuel Pros</span></div>
+  <div class="rangebox">
+    <label for="from">From</label><input type="date" id="from">
+    <label for="to">To</label><input type="date" id="to">
+    <div class="chips">
+      <button class="chip" data-preset="unbilled">Unbilled</button>
+      <button class="chip" data-preset="week">This week</button>
+      <button class="chip" data-preset="month">This month</button>
+      <button class="chip" data-preset="all">All</button>
+    </div>
+  </div>
+  <button class="print-btn" id="print">Save PDF</button>
+</div>
+
+<div class="stage">
+  <aside class="rail">
+    <h2>Sessions in range</h2>
+    <div id="ledger"></div>
+
+    <div class="runner">
+      <div class="row"><span>Selected</span><b class="mono" id="r-count">0 sessions</b></div>
+      <div class="row"><span>Hours</span><b class="mono" id="r-hours">0.00</b></div>
+      <div class="row total"><span>Amount</span><b class="mono" id="r-amount">$0.00</b></div>
+    </div>
+
+    <h2>Invoice</h2>
+    <div class="opt">
+      <div class="field"><label for="invno">Number</label><input type="text" id="invno" value="AFP-2026-002"></div>
+      <div class="field"><label for="invdate">Invoice date</label><input type="date" id="invdate"></div>
+      <div class="field"><label for="terms">Terms</label>
+        <select id="terms"><option>Net 15</option><option>Net 30</option><option>Due on receipt</option></select>
+      </div>
+      <div class="field"><label for="duedate">Due</label><input type="date" id="duedate"></div>
+    </div>
+    <div class="field"><label for="detail">Work detail</label>
+      <select id="detail">
+        <option value="invoice">Invoice descriptions (client-facing)</option>
+        <option value="summary">Summaries only (short)</option>
+        <option value="notes">Session notes (verbatim)</option>
+        <option value="none">Line items only</option>
+      </select>
+    </div>
+    <div class="field"><label for="round">Hour rounding</label>
+      <select id="round">
+        <option value="0">Exact (2 decimals)</option>
+        <option value="0.25">Nearest quarter hour</option>
+        <option value="0.1">Nearest tenth</option>
+      </select>
+    </div>
+    <label class="toggle"><input type="checkbox" id="showall"> Show non-billable and superseded</label>
+    <label class="toggle"><input type="checkbox" id="showsid" checked> Print session IDs on line items</label>
+
+    <h2>Data flags</h2>
+    <div class="flags" id="flags"></div>
+  </aside>
+
+  <main class="paperstage">
+    <div class="paper" id="paper"></div>
+  </main>
+</div>
+
+<script>
+/* ============================================================================
+   SNAPSHOT SEAM
+   Everything below is a verbatim snapshot of the three Notion databases as of
+   2026-07-15. In the production build this object is the JSON returned by
+   GET /api/notion/afp — nothing else in this file changes.
+   ========================================================================== */
+const DATA = {
+  client: {
+    name: "Anytime Fuel Pros",
+    defaultRate: 30,
+    timezone: "America/Chicago",
+    billTo: "Anytime Fuel Pros\n[street address]\n[city, state zip]\n[AP contact / email]"
+  },
+  from: "Austin Brower\n[street address]\nSan Antonio, TX [zip]\n[email] · [phone]",
+  lastInvoice: { number: "AFP-2026-001", periodEnd: "2026-07-10" },
+  hours: [
+    {url:"https://app.notion.com/39e4259dcffa816db1b3ced6b8508b9d",date:"2026-07-15",sid:"AFP-2026-07-15-0700-1438",start:"7:00 AM",end:"2:38 PM",brk:0,hours:7.6333,rate:30,billable:true,status:"Reviewed",location:"Remote",work:[],
+      notes:"AFP digital systems audit and BOL Review Process V2 support. Finalized and delivered the technical manual; verified the Power Automate export; created the Power Automate flow/action inventory and Excel workbook inventory; reconciled prior Work Done and hours records; archived daily work logs; established and documented the AFP Digital Systems Audit OneDrive repository; completed controlled non-overlapping BOL/invoice batch testing; verified Pending cleanup, Sheet1 matching, and company reporting; documented the five-file batch operating procedure; and organized hours and invoice records. Session closed and confirmed with no non-billable break recorded."},
+    {url:"https://app.notion.com/39d4259dcffa811f90ddfb776dd187e4",date:"2026-07-14",sid:"AFP-2026-07-14-1602-1945",start:"4:02 PM",end:"7:45 PM",brk:null,hours:3.72,rate:30,billable:true,status:"Reviewed",location:"Not specified",work:["wd-0714"],
+      notes:"BOL Review Process V2 technical documentation, ZIP audit, Notion reconciliation, live workbook verification, and Claude DOCX handoff preparation."},
+    {url:"https://app.notion.com/39d4259dcffa8149b95fdd53cf1cb756",date:"2026-07-14",sid:"AFP-2026-07-14-1345-1530",start:"1:45 PM",end:"3:30 PM",brk:null,hours:1.75,rate:30,billable:true,status:"Reviewed",location:"Not specified",work:["wd-0714"],
+      notes:"BOL Review Process V2 technical documentation and 99-import evidence organization."},
+    {url:"https://app.notion.com/39d4259dcffa81ceb16ac26cc8d8c02f",date:"2026-07-14",sid:"AFP-2026-07-14-1144-1248",start:"11:44 AM",end:"12:48 PM",brk:null,hours:1.07,rate:30,billable:true,status:"Reviewed",location:"Not specified",work:["wd-0714"],
+      notes:"BOL Review workbook company-tab fuel totals, dynamic-array formula development, and vendor-name normalization."},
+    {url:"https://app.notion.com/39c4259dcffa81b1b5adc3847d481826",date:"2026-07-13",sid:"AFP-2026-07-13-01",start:"07:00",end:"14:25",brk:0,hours:7.4167,rate:30,billable:true,status:"Ready to Invoice",location:"Onsite / AFP",work:["wd-0713"],
+      notes:"AFP Power Automate BOL Review V2/V3 development, duplicate-prevention repair, end-to-end testing, source-document verification, and Notion documentation organization. No non-billable break recorded."},
+    {url:"https://app.notion.com/39a4259dcffa81a2b695c8fe84cc1f3e",date:"2026-07-10",sid:"AFP-2026-07-10-001",start:"08:40",end:"14:30",brk:0,hours:5.833333333333333,rate:30,billable:true,status:"Invoiced",location:null,work:["wd-0710"],notes:null},
+    {url:"https://app.notion.com/3994259dcffa81c9baf6d7a0abd71d6f",date:"2026-07-09",sid:"AFP-2026-07-09-001",start:"09:12",end:"14:00",brk:0,hours:4.8,rate:30,billable:true,status:"Invoiced",location:"Not specified",work:["wd-0709"],
+      notes:"Closed billable session. Work included Command Center/Sales Hub planning, vendor tab formulas, Pending/Unmatched troubleshooting, and safe Parse JSON troubleshooting plan."},
+    {url:"https://app.notion.com/3994259dcffa810c8882ca08a769f7aa",date:"2026-07-08",sid:"AFP-2026-07-08-002",start:"11:00",end:"13:00",brk:0,hours:2,rate:30,billable:true,status:"Invoiced",location:"Office / onsite",work:["wd-0708"],notes:"Confirmed billable work block."},
+    {url:"https://app.notion.com/3994259dcffa818da2f3dee38962432f",date:"2026-07-08",sid:"AFP-2026-07-08-003",start:"14:00",end:"17:49",brk:0,hours:3.816666666666667,rate:30,billable:true,status:"Invoiced",location:"Not specified",work:["wd-0708"],notes:"Closed billable session."},
+    {url:"https://app.notion.com/3994259dcffa81448954c5c8fda18626",date:"2026-07-08",sid:"AFP-2026-07-08-001",start:"09:00",end:"11:00",brk:0,hours:2,rate:30,billable:false,status:"Reviewed",location:"Office / onsite",work:["wd-0708"],notes:"Onsite time before active billable work began."},
+    {url:"https://app.notion.com/3994259dcffa811589b7f07d355773a5",date:"2026-07-08",sid:"AFP-2026-07-08-004",start:"17:10",end:"17:49",brk:0,hours:0.65,rate:0,billable:false,status:"Superseded",location:"Not specified",work:[],notes:"SUPERSEDED BY MERGED 2026-07-08 14:00-17:49 RECORD - DO NOT BILL"}
+  ],
+  workDone: {
+    "wd-0714":{title:"July 14, 2026",date:"2026-07-14",includeInInvoice:false,approval:"Needs Review",
+      summary:"Improved the AFP BOL Review workbook's company-specific reporting and continued the BOL Review Process V2 documentation project. Developed a dynamic totals-row formula for company tabs, documented the exported Power Automate flow and all 29 actions or nested actions, built the remaining technical documentation framework, and completed a comprehensive ZIP-to-Notion audit that corrected workflow order, matching, duplicate-prevention, Pending cleanup, notification, and final-write documentation.",
+      invoice:"Reviewed and improved the AFP BOL Review workbook's company-specific reporting structure and developed a dynamic formula that keeps fuel totals directly below automatically expanding company records. Verified the master-table and dynamic-array design, expanded totals to all eight fuel columns, and addressed inconsistent vendor-name formatting. Continued the BOL Review Process V2 documentation project by reviewing Justin's baseline material and the current Power Automate export, organizing the 99-import workspace, documenting the flow's complete action inventory, systems, dependencies, parsing stages, validation, duplicate prevention, Pending handling, matching, discrepancy alerts, cleanup, final writing, recovery procedures, and regression testing, and completing a comprehensive source audit that reconciled the documentation to the exported workflow."},
+    "wd-0713":{title:"July 13, 2026",date:"2026-07-13",includeInInvoice:true,approval:"Approved",
+      summary:"Power Automate BOL workflow development, duplicate-prevention repair, end-to-end testing, and AFP Notion documentation organization.",
+      invoice:"Reviewed and improved AFP's Power Automate BOL and invoice processing workflows. Built the core structure of a controlled Pending-record recheck flow, repaired duplicate-prevention logic in the live V2 process, restored the SharePoint Split On configuration, and completed successful end-to-end testing through file retrieval, extraction, parsing, and Excel Pending-row creation. Verified unmatched test results against source PDFs and continued organizing AFP's Notion workspace and digital systems documentation structure."},
+    "wd-0710":{title:"BOL Review Process V2 - Duplicate Prevention, Pending Cleanup & Extraction Fixes",date:"2026-07-10",includeInInvoice:true,approval:"Approved",
+      summary:"Redesigned duplicate handling and Pending cleanup for the BOL Review Process V2, then strengthened the Anthropic extraction prompt for fuel classification and document-number accuracy.",
+      invoice:"Troubleshot and improved the BOL Review Process V2 automation by redesigning Pending-table cleanup, adding duplicate-prevention checks for completed and staged records, stabilizing vendor reporting formulas, and refining the Anthropic extraction prompt for fuel classification and document-number accuracy. Performed controlled batch and duplicate stress testing across BOL and invoice files and documented remaining edge cases for follow-up."},
+    "wd-0709":{title:"July 9, 2026",date:"2026-07-09",includeInInvoice:true,approval:"Approved",
+      summary:"Continued AFP Power Automate / BOL Review Process V2 development and documentation, focused on separating uploaded documents into matched, pending, and manual-review categories.",
+      invoice:"Performed AFP Power Automate development and documentation for the BOL Review Process V2 workflow. Updated the BOL Review workbook structure with reporting/status fields, documented flow architecture in Notion, created a dedicated Unmatched validation path, configured Excel row mappings for matched and manual-review records, tested SharePoint PDF upload routing, confirmed bad/incomplete documents route to Unmatched, diagnosed matching failures caused by simultaneous Excel access, enabled trigger concurrency control to process uploaded PDFs sequentially, and verified batch routing behavior across Sheet1, Pending, and Unmatched outputs."},
+    "wd-0708":{title:"July 8, 2026",date:"2026-07-08",includeInInvoice:true,approval:"Approved",
+      summary:"Started organizing AFP contractor work into a structured tracking workflow and worked through the BOL Review Process V2 automation, extraction testing, Excel table outputs, and early documentation structure.",
+      invoice:"Performed AFP systems and automation support, including review and documentation of the Power Automate BOL Review Process V2, testing BOL/invoice extraction behavior, validating expected BOL and fuel gallon values against workflow outputs, reviewing Sheet1 and Pending table results, identifying Anthropic API credit limitations as a blocker, and beginning structured documentation/work logging for future invoice and maintenance records."}
+  }
+};
+
+/* ---------- state ---------- */
+const state = { from:"2026-07-11", to:"2026-07-15", picked:new Set() };
+const $ = id => document.getElementById(id);
+const money = n => "$" + n.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmtDate = iso => { const [y,m,d] = iso.split("-").map(Number);
+  return new Date(y,m-1,d).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}); };
+const shortDate = iso => { const [y,m,d] = iso.split("-").map(Number);
+  return new Date(y,m-1,d).toLocaleDateString("en-US",{month:"short",day:"numeric"}); };
+const addDays = (iso,n) => { const [y,m,d]=iso.split("-").map(Number); const t=new Date(y,m-1,d+n);
+  return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,"0")}-${String(t.getDate()).padStart(2,"0")}`; };
+
+function roundHours(h){
+  const step = parseFloat($("round").value);
+  if(!step) return Math.round(h*100)/100;
+  return Math.round(h/step)*step;
+}
+function inRange(r){ return r.date >= state.from && r.date <= state.to; }
+function eligible(r){ return $("showall").checked ? true : (r.billable && r.status !== "Superseded"); }
+function visible(){ return DATA.hours.filter(r => inRange(r) && eligible(r)); }
+function selected(){ return DATA.hours.filter(r => state.picked.has(r.url)).sort((a,b)=> a.date.localeCompare(b.date) || a.sid.localeCompare(b.sid)); }
+
+/* ---------- ledger ---------- */
+function renderLedger(){
+  const rows = visible().sort((a,b)=> b.date.localeCompare(a.date) || a.sid.localeCompare(b.sid));
+  const el = $("ledger");
+  if(!rows.length){ el.innerHTML = `<p style="color:var(--dim);font-size:12px;padding:8px 2px">No sessions between ${state.from} and ${state.to}.</p>`; return; }
+  const days = [...new Set(rows.map(r=>r.date))];
+  el.innerHTML = days.map(day => {
+    const dayRows = rows.filter(r=>r.date===day);
+    const dayH = dayRows.reduce((s,r)=> s + (state.picked.has(r.url) ? r.hours : 0), 0);
+    return `<div class="day">
+      <div class="day-head"><span class="d">${day}</span><span class="h">${dayH ? dayH.toFixed(2)+" h" : "—"}</span></div>
+      ${dayRows.map(r=>{
+        const locked = r.status === "Invoiced" || r.status === "Superseded";
+        const tag = r.status === "Invoiced" ? '<span class="tag invoiced">invoiced</span>'
+                  : r.status === "Ready to Invoice" ? '<span class="tag ready">ready</span>'
+                  : r.status === "Superseded" ? '<span class="tag nobill">superseded</span>' : '';
+        const nb = !r.billable ? '<span class="tag nobill">non-billable</span>' : '';
+        return `<label class="sess ${state.picked.has(r.url)?"on":""} ${locked?"locked":""}">
+          <input type="checkbox" data-url="${r.url}" ${state.picked.has(r.url)?"checked":""}>
+          <span>
+            <span class="sid">${r.sid}</span>
+            <span class="meta">${r.start} – ${r.end}${r.location?" · "+r.location:""}<br>${tag}${nb}<span class="tag">${r.status}</span></span>
+          </span>
+          <span class="amt"><b>${r.hours.toFixed(2)} h</b><span>${money(r.hours * r.rate)}</span></span>
+        </label>`;
+      }).join("")}
+    </div>`;
+  }).join("");
+  el.querySelectorAll("input[type=checkbox]").forEach(cb => cb.addEventListener("change", e => {
+    e.target.checked ? state.picked.add(e.target.dataset.url) : state.picked.delete(e.target.dataset.url);
+    render();
+  }));
+}
+
+/* ---------- paper ---------- */
+function renderPaper(){
+  const rows = selected();
+  const p = $("paper");
+  if(!rows.length){
+    p.innerHTML = `<div class="empty">Pick sessions on the left and the invoice builds itself here.</div>`;
+    return;
+  }
+  const lines = rows.map(r => ({ ...r, billed: roundHours(r.hours), amount: roundHours(r.hours) * r.rate }));
+  const totalHours = lines.reduce((s,l)=> s + l.billed, 0);
+  const totalAmt   = lines.reduce((s,l)=> s + l.amount, 0);
+  const pStart = rows[0].date, pEnd = rows[rows.length-1].date;
+  const rates = [...new Set(lines.map(l=>l.rate))];
+
+  const mode = $("detail").value;
+  let detailHTML = "";
+  if(mode !== "none"){
+    let entries = [];
+    if(mode === "notes"){
+      entries = lines.filter(l=>l.notes).map(l => ({ h:`${fmtDate(l.date)}`, stamp:`${l.sid} · ${l.start}–${l.end} · ${l.billed.toFixed(2)} h`, body:l.notes }));
+    } else {
+      const ids = [...new Set(lines.flatMap(l=>l.work))];
+      entries = ids.map(id => {
+        const w = DATA.workDone[id];
+        const hrs = lines.filter(l=>l.work.includes(id)).reduce((s,l)=>s+l.billed,0);
+        return { h:w.title, stamp:`${fmtDate(w.date)} · ${hrs.toFixed(2)} h`, body: mode==="summary" ? w.summary : w.invoice };
+      }).sort((a,b)=> a.stamp.localeCompare(b.stamp));
+    }
+    if(entries.length) detailHTML = `<div class="detail"><h3>Work performed</h3>${
+      entries.map(e=>`<div class="entry"><h4>${e.h}</h4><div class="stamp">${e.stamp}</div><p>${e.body}</p></div>`).join("")
+    }</div>`;
+  }
+
+  p.innerHTML = `
+    <div class="inv-head">
+      <div><h1>Invoice</h1><div class="sub" contenteditable>Independent contractor · digital systems &amp; automation</div></div>
+      <div class="inv-no">
+        <div class="n">${$("invno").value}</div>
+        <div class="dates">Issued ${fmtDate($("invdate").value)}<br>Due ${fmtDate($("duedate").value)} · ${$("terms").value}</div>
+      </div>
+    </div>
+
+    <div class="parties">
+      <div><div class="k">From</div><div class="v" contenteditable>${DATA.from}</div></div>
+      <div><div class="k">Bill to</div><div class="v" contenteditable>${DATA.client.billTo}</div></div>
+    </div>
+
+    <div class="period">
+      <span>Service period</span>
+      <b>${fmtDate(pStart)} — ${fmtDate(pEnd)}</b>
+    </div>
+
+    <table class="items">
+      <thead><tr>
+        <th>Date</th><th>Description</th>
+        <th style="text-align:right">Hours</th><th style="text-align:right">Rate</th><th style="text-align:right">Amount</th>
+      </tr></thead>
+      <tbody>${lines.map(l=>`
+        <tr>
+          <td class="date-c">${shortDate(l.date)}</td>
+          <td class="desc">
+            <b>${l.start} – ${l.end}${l.location && l.location!=="Not specified" ? " · "+l.location : ""}</b>
+            ${$("showsid").checked ? `<small>${l.sid}</small>` : ""}
+          </td>
+          <td class="r">${l.billed.toFixed(2)}</td>
+          <td class="r">${money(l.rate)}</td>
+          <td class="r">${money(l.amount)}</td>
+        </tr>`).join("")}
+      </tbody>
+    </table>
+
+    <div class="totals"><table>
+      <tr><td>Billable hours</td><td>${totalHours.toFixed(2)}</td></tr>
+      <tr><td>Rate</td><td>${rates.length===1 ? money(rates[0])+" / hr" : "mixed"}</td></tr>
+      <tr class="grand"><td>Total due</td><td>${money(totalAmt)}</td></tr>
+    </table></div>
+
+    ${detailHTML}
+
+    <div class="foot"><span>${DATA.client.name}</span><span>${$("invno").value} · ${lines.length} session${lines.length>1?"s":""} · ${totalHours.toFixed(2)} h</span></div>`;
+}
+
+/* ---------- flags ---------- */
+function renderFlags(){
+  const f = [];
+  const rows = selected();
+  rows.filter(r=>!r.work.length).forEach(r => f.push(`<b>${r.sid}</b> has no linked Work Done row, so it will appear as a line item with no description in the detail section.`));
+  [...new Set(rows.flatMap(r=>r.work))].forEach(id => {
+    const w = DATA.workDone[id];
+    if(!w.includeInInvoice) f.push(`Work Done "<b>${w.title}</b>" has <b>Include in Invoice</b> unchecked in Notion but its hours are selected. Check the box or drop those sessions.`);
+    if(w.approval !== "Approved") f.push(`Work Done "<b>${w.title}</b>" is still <b>${w.approval}</b>, not Approved.`);
+  });
+  rows.filter(r=>r.status==="Invoiced").forEach(r => f.push(`<b>${r.sid}</b> is already marked <b>Invoiced</b> (on ${DATA.lastInvoice.number}). Double billing risk.`));
+  rows.filter(r=>!r.billable).forEach(r => f.push(`<b>${r.sid}</b> is marked non-billable.`));
+  $("flags").innerHTML = f.length ? f.map(x=>`<p><span>${x}</span></p>`).join("")
+    : `<p style="color:#8fbf9f"><span>Nothing to flag. Selection is clean.</span></p>`;
+  $("flags").style.borderColor = f.length ? "#4a3f2a" : "#2a3f30";
+  $("flags").style.background  = f.length ? "#241f16" : "#16241b";
+}
+
+/* ---------- runner ---------- */
+function renderRunner(){
+  const rows = selected();
+  const h = rows.reduce((s,r)=> s + roundHours(r.hours), 0);
+  const a = rows.reduce((s,r)=> s + roundHours(r.hours) * r.rate, 0);
+  $("r-count").textContent  = `${rows.length} session${rows.length===1?"":"s"}`;
+  $("r-hours").textContent  = h.toFixed(2);
+  $("r-amount").textContent = money(a);
+}
+
+function render(){ renderLedger(); renderRunner(); renderPaper(); renderFlags(); }
+
+/* ---------- selection helpers ---------- */
+function autoSelect(){
+  state.picked.clear();
+  visible().filter(r => r.billable && r.status !== "Invoiced" && r.status !== "Superseded")
+           .forEach(r => state.picked.add(r.url));
+}
+function setRange(from,to){ state.from=from; state.to=to; $("from").value=from; $("to").value=to; autoSelect(); render(); }
+
+/* ---------- wiring ---------- */
+$("from").addEventListener("change", e => { state.from = e.target.value; autoSelect(); render(); });
+$("to").addEventListener("change",   e => { state.to   = e.target.value; autoSelect(); render(); });
+["invno","invdate","terms","duedate","detail","showsid"].forEach(id =>
+  $(id).addEventListener("input", () => { if(id==="terms") syncDue(); renderPaper(); }));
+$("terms").addEventListener("change", () => { syncDue(); renderPaper(); });
+$("invdate").addEventListener("change", () => { syncDue(); renderPaper(); });
+$("round").addEventListener("change", () => { renderRunner(); renderPaper(); });
+$("showall").addEventListener("change", render);
+$("print").addEventListener("click", () => window.print());
+
+document.querySelectorAll(".chip").forEach(c => c.addEventListener("click", () => {
+  const today = "2026-07-15";
+  const p = c.dataset.preset;
+  if(p==="unbilled") setRange(addDays(DATA.lastInvoice.periodEnd,1), today);
+  if(p==="week")     setRange(addDays(today,-6), today);
+  if(p==="month")    setRange(today.slice(0,8)+"01", today);
+  if(p==="all")      setRange("2026-01-01", today);
+}));
+
+function syncDue(){
+  const t = $("terms").value, d = $("invdate").value;
+  $("duedate").value = t==="Net 15" ? addDays(d,15) : t==="Net 30" ? addDays(d,30) : d;
+}
+
+/* ---------- boot: default to everything not yet invoiced ---------- */
+$("invdate").value = "2026-07-15";
+syncDue();
+setRange(addDays(DATA.lastInvoice.periodEnd,1), "2026-07-15");
+</script>

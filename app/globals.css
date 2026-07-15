@@ -1,0 +1,18 @@
+/* Phase 0 baseline only.
+   The console (Station) and the paper (the invoice) are two separate design
+   systems and their tokens do not get unified. See docs/10-visual-direction.md.
+   Station tokens land here in Phase 2, scoped to a single wrapper. */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: system-ui, sans-serif;
+}
