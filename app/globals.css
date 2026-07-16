@@ -541,6 +541,25 @@ body {
   padding-bottom: 16px;
   border-bottom: 2px solid var(--ink);
 }
+/* Letterhead. Battle Bound Branding LLC is the contracting entity, decided in
+   docs/09-brand.md, so this is live rather than conditional. Horizontal lockup only:
+   the square variant does not go in a horizontal slot. Sized in inches because this is
+   a print artifact, not a screen one. At 1.6in the 3000px source resolves far past any
+   printer, so it is never upscaled. */
+/* The logo sits beside the heading, and the tagline runs under both rather than being
+   trapped in the column next to the logo. Printing it the other way squeezed the
+   invoice-number block until "Net 15" broke across lines with "15" orphaned. */
+.lockup {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.letterhead {
+  width: 1.6in;
+  height: auto;
+  display: block;
+  flex-shrink: 0;
+}
 .inv-head h1 {
   font-size: 23pt;
   font-weight: 700;
@@ -555,19 +574,25 @@ body {
   text-transform: uppercase;
   margin-top: 7px;
 }
+/* Never let the identifying block be the one that collapses. The invoice number and
+   its terms keep their natural width; if anything has to give, it is the tagline. */
 .inv-no {
   text-align: right;
   font-family: "IBM Plex Mono", monospace;
+  flex-shrink: 0;
+  padding-left: 24px;
 }
 .inv-no .n {
   font-size: 13pt;
   font-weight: 600;
+  white-space: nowrap;
 }
 .inv-no .dates {
   font-size: 8pt;
   color: var(--ink-dim);
   margin-top: 6px;
   line-height: 1.7;
+  white-space: nowrap;
 }
 
 .parties {

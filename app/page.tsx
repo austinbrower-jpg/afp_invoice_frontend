@@ -456,7 +456,22 @@ export default function Page() {
               <>
                 <div className="inv-head">
                   <div>
-                    <h1>Invoice</h1>
+                    <div className="lockup">
+                      {/* Plain img, not next/image, on purpose. next/image lazy-loads by
+                          default, and a letterhead that has not decoded yet when the
+                          print dialog opens prints as a blank box. Imported from
+                          public/brand/, never from brand-assets/, per CLAUDE.md. */}
+                      <img
+                        className="letterhead"
+                        src="/brand/bbb-logo-horizontal-black.png"
+                        width={3000}
+                        height={1000}
+                        loading="eager"
+                        decoding="sync"
+                        alt="Battle Bound Branding LLC"
+                      />
+                      <h1>Invoice</h1>
+                    </div>
                     <div className="sub" contentEditable suppressContentEditableWarning>
                       Independent contractor · digital systems &amp; automation
                     </div>
