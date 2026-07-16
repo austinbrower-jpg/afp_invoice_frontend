@@ -110,9 +110,15 @@ Status meanings in practice:
 | `Color` | text (`#6366f1`, used as the accent in the prototype) |
 | `Notes` | text, missed on the first schema read. Holds a migration provenance note on the AFP row, not billing-relevant. |
 | `Migration Key` | text, ignore, same as Hours Worked and Work Done. |
+| `Billing Address` | text, added 2026-07-16. AFP row holds `18325 Bracken Dr, San Antonio, TX 78266`. |
+| `AP Contact` | text, added 2026-07-16, still empty. |
+| `Payment Terms` | text, added 2026-07-16, still empty. |
 | relations | Hours Worked, Work Done, Projects, Invoice Reports |
 
-No billing address, AP contact, or payment instructions exist on this row. See gap 4.
+Billing identity properties (`Billing Address`, `AP Contact`, `Payment Terms`) were added
+on 2026-07-16, verified live. See gap 4. The app still renders the bill-to block from a
+constant in `lib/notion.ts`, not from these properties, since the phone on the invoice is
+not a Notion property and the app is read-only.
 
 ## Date property expansion
 

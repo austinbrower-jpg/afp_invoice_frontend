@@ -42,26 +42,31 @@ export type Payload = {
   workDone: Record<string, WorkDone>;
 };
 
-// Gap 4 in docs/07-data-gaps.md. Neither block exists in Notion.
+// Gap 4 in docs/07-data-gaps.md. Both blocks are constants here, not live Notion reads.
 //
-// The remit-to side is settled: docs/09-brand.md decides Battle Bound Branding LLC is
-// the contracting entity, so this is a known constant that lives here rather than in
-// Notion, because it is ours and not the client's. The address fields are still
-// placeholders. AFP's side is entirely unknown and still blocks sending a real invoice.
-// Both render as editable blocks on the paper until the Client row gains Billing
-// Address and AP Contact properties.
+// The remit-to side (Battle Bound Branding LLC, with Austin Brower as the contractor
+// doing the work) is ours per docs/09-brand.md, so it stays a repo constant.
+//
+// The bill-to side is AFP's. Their Billing Address also lives in Notion on the Clients
+// row ("18325 Bracken Dr, San Antonio, TX 78266", verified 2026-07-16), so readClient
+// could source it with text(p, "Billing Address"). It stays a constant for now because
+// the phone Austin supplied is not a Notion property and the app is read-only, so the
+// block is a hybrid either way. AP Contact and Payment Terms are still empty in Notion.
+//
+// Both blocks render editable on the paper, so either can be tweaked per invoice.
 const FROM_BLOCK = [
   "Battle Bound Branding LLC",
-  "[street address]",
-  "San Antonio, TX [zip]",
-  "[email] · [phone]",
+  "Austin Brower, contractor",
+  "215 N Loop 1604 E, Apt. 8301",
+  "San Antonio, TX 78232",
+  "austinbrower@battleboundbranding.com · (210) 215-6907",
 ].join("\n");
 
 const BILL_TO_BLOCK = [
   "Anytime Fuel Pros",
-  "[street address]",
-  "[city, state zip]",
-  "[AP contact / email]",
+  "18325 Bracken Dr",
+  "San Antonio, TX 78266",
+  "(210) 381-3835",
 ].join("\n");
 
 export class NotionDataError extends Error {
