@@ -20,19 +20,29 @@ Next.js App Router, TypeScript, `@notionhq/client`. Own repo, own Vercel project
 
 Done when: `npm run dev` serves an empty page and `.env.example` exists.
 
-### Phase 0.5 — Diagnose the lag
+### Phase 0.5 — Lag cause, already diagnosed, closed
 
-The existing app is slow. This is a separate problem from the redesign, and the redesign
-will not fix it. Diagnose before changing anything.
+Diagnosed live against the production deployment on 2026-07-16, not guessed. Notion
+rate-limits at roughly 3 requests per second. Routes that resolve many relations serially,
+the Clients row alone resolves 17, collapse under concurrent load: sequential requests
+ran at roughly 109ms median, the same routes under a 16-way concurrent burst hit up to
+7628ms, a production log captured the exact failure as `DataProviderError: ... rate
+limited`. This holds true against the deploy that already fixed the separate prefetch
+storm bug, so the relation fan-out is the real, independent cause, not a side effect of
+that other bug.
 
-Likeliest cause: each route fetches Notion on mount with no shared cache, and relations
-resolve per-row, producing an N+1 against an API that rate-limits at roughly 3 requests
-per second. Eleven rows becomes dozens of round trips on every navigation.
+This phase is closed. Do not reopen it by re-auditing the old app's code, git history, or
+further deploys, that evidence-gathering already happened and the cause is named. The fix
+is Phase 1's architecture: one server-side fetch, joined once, cached, shared across every
+route, per `02-architecture.md`. That design does not resolve relations per-row under
+concurrent load, so it does not inherit this failure mode by construction, not by further
+diagnosis.
 
-Read-only means the fix is cheap. One server-side fetch, joined once, cached, shared
-across every route. Nothing invalidates because nothing writes.
+If the new app is slow after Phase 5 ships to Vercel, that is a new investigation against
+the new app's own traces and its own code. It is not a continuation of this one, and nothing
+here should be assumed to still apply to a codebase this different.
 
-Done when: the cause is named with evidence from the network tab or a trace, not guessed.
+Done: cause named with live evidence, see above. Move to Phase 1.
 
 ### Phase 1 — Read path
 

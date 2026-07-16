@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@notionhq/client": "^2.2.15",
+    "@notionhq/client": "^5.23.2",
     "next": "^15.1.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
