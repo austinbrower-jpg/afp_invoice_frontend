@@ -90,8 +90,17 @@ live on 2026-07-15. Do not port the slug format. If a build reads this fixture a
 `wd-0714`-style keys into the real join logic, every relation lookup against live Notion
 will silently return nothing, since no real page ID looks like that.
 
-Everything else, the hours values, dates, statuses, notes, and prose in `invoice`, is
-verbatim from Notion and safe to use as the fixture for testing the mapping. If the live
-route returns something that does not match that snapshot, the mapping is wrong, not the
-snapshot, except for the join key format itself, which the snapshot deliberately
-simplifies.
+The machine-readable fields, hours values, dates, statuses, rates, `brk`, `billable`,
+`location`, are verbatim from Notion and safe to use as the fixture for testing the
+mapping. If those fields drift from a live pull, the mapping is wrong, not the snapshot.
+
+**The prose fields are not verbatim, confirmed live on 2026-07-16.** `invoice` and
+`summary` in the fixture are an editorially cleaned approximation: curly quotes
+straightened, em dashes flattened to CLAUDE.md's own no-em-dash rule, and some entries
+truncated well below their real length, July 9's invoice description is 642 characters in
+the fixture and 1548 live, a 2.4x difference. This is not a mapping bug and not stale
+data, every Work Done row was last edited before the 2026-07-15 snapshot, someone hand-
+edited the fixture prose for readability after copying it out of Notion. Do not use fixture
+string length or punctuation to validate a mapping. Do use it to validate print CSS only
+with real live-length prose substituted in, see `06-ui-spec.md`'s print section and
+`01-plan.md` Phase 3.

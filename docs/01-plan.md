@@ -94,9 +94,11 @@ sending. See `02-architecture.md`.
 
 ## Prerequisites
 
-Fix Gap 1 in `07-data-gaps.md` before Phase 1. The date range feature currently rests on a
-lexical string sort of a text property. Everything in this app depends on that filter
-being correct.
+Gap 1 in `07-data-gaps.md` is closed as of 2026-07-16, a real `Session Date` property
+exists and all 11 rows are backfilled and verified. It did not end up blocking Phase 1 in
+practice, Phase 1 shipped against the title behind a seam with a hard-fail validator, per
+CLAUDE.md's stop-and-ask rule on writes. Point that seam at `Session Date` when
+convenient.
 
 ## Explicitly not building
 

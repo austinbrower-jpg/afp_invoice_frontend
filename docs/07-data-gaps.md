@@ -5,15 +5,22 @@ blocks Phase 1. Gap 4 blocks sending a real invoice. The rest are handled by UI 
 
 ## 1. `Date` in Hours Worked is a text title property, not a date
 
-**Blocking.** Fix before Phase 1.
+**Closed 2026-07-16.** `Session Date`, a real date property, now exists on Hours Worked
+and all 11 rows are backfilled, verified by a live query matching every row's `Date`
+title against the new `date:Session Date:start` value, all 11 exact. The `Date` title
+property is unchanged and stays as the human-readable label.
 
-The whole app filters sessions by date range. That filter currently works only because
-every `Date` value happens to be an ISO string and ISO strings sort lexically. One row
-entered as `7/15/26` sorts before everything and silently drops out of every invoice. No
-error, no flag, just a session you never billed for.
+This was not blocking by the time it closed. Phase 1 shipped first with `date` sourced
+from the title behind a single seam, plus a validator that hard-fails on any non-ISO
+title rather than silently dropping a session. That seam should now be pointed at
+`Session Date` instead of the title, a one-line change, but nothing is broken if that
+swap hasn't happened yet, since all 11 titles and all 11 `Session Date` values agree.
 
-Fix: add a real `Session Date` date property to Hours Worked, backfill all 11 rows from
-the existing titles, and filter on that. Keep the title as the human-readable label.
+Original problem, kept for context: the date filter worked only because every `Date`
+title happened to be an ISO string that sorts lexically. One row entered as `7/15/26`
+would have sorted before everything and silently dropped out of every invoice. That risk
+is gone now that a real date type exists, but the validator from Phase 1 is worth keeping
+regardless, entry is still manual and will drift again eventually.
 
 ## 2. A session with no linked Work Done row
 
