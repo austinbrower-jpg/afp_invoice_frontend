@@ -255,29 +255,28 @@ export async function fetchPayload(): Promise<Payload> {
   };
 }
 
-// Gap 1 in docs/07-data-gaps.md is still open: Hours Worked has no date property, so
-// the session date is read from the Date title, which holds an ISO string by
-// convention only. This is the one seam to change when a real Session Date property
-// exists. The Payload is identical either way, so nothing downstream moves.
+// The seam for gap 1 in docs/07-data-gaps.md, now closed. Session Date is a real date
+// property as of 2026-07-16, backfilled and verified against every Date title, so read
+// it rather than the title. The title stays as the human-readable label. The Payload is
+// identical either way, which is why this swap moved nothing downstream.
 function sessionDate(p: Props): string {
-  return text(p, "Date").trim();
+  return dateStart(p, "Session Date");
 }
 
-// The whole app filters by date range, and that filter currently rests on the title
-// happening to be ISO. A row typed as 7/15/26 would sort out of range and vanish from
-// every invoice with no error and no flag. Refuse to serve rather than quietly drop a
-// billable session. Delete this once gap 1 is fixed and the date is a real property.
+// Kept after gap 1 closed, on purpose. A real date type means a row can no longer hold
+// "7/15/26", but it can still hold nothing at all, and an empty Session Date would sort
+// out of every range and drop a billable session with no error and no flag, which is the
+// same failure the gap described. Entry is still manual and will drift again. Refuse to
+// serve rather than quietly drop a session. See docs/07-data-gaps.md.
 function assertDatesUsable(hours: Session[]): void {
   const bad = hours.filter((h) => !ISO_DATE.test(h.date));
   if (bad.length === 0) return;
   const named = bad.map((h) => `${h.sid || "(no Session ID)"} -> "${h.date}"`);
   throw new NotionDataError(
-    `${bad.length} Hours Worked row(s) have a Date title that is not YYYY-MM-DD: ${named.join(
-      ", "
-    )}`,
-    "Date is a text title, not a date property, so these rows sort wrong and would " +
-      "silently drop out of every invoice. Fix the title in Notion, or close gap 1 by " +
-      "adding a real Session Date property. See docs/07-data-gaps.md."
+    `${bad.length} Hours Worked row(s) have no usable Session Date: ${named.join(", ")}`,
+    "Session Date is empty or unreadable on those rows, so they would sort out of every " +
+      "date range and silently drop off the invoice. Fill it in Notion. The Date title " +
+      "is the human-readable label and is not used for filtering. See docs/07-data-gaps.md."
   );
 }
 
