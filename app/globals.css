@@ -1448,6 +1448,69 @@ table.items .desc small {
     break-inside: avoid;
   }
 }
+/* ---------- earnings by week ----------
+   Horizontal week bars that rhyme with the day trace. Collected is --ok, owed is --hot,
+   the two only console places --hot is spent besides the runner and the now line, and it
+   is spent here for the same reason: money not yet collected. docs/10. */
+.earn {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.earn-row {
+  display: grid;
+  grid-template-columns: 54px 1fr 46px 78px;
+  gap: 10px;
+  align-items: center;
+}
+.earn-wk {
+  font-size: 10px;
+  color: var(--dim);
+  letter-spacing: 0.04em;
+}
+.earn-track {
+  position: relative;
+  display: flex;
+  height: 16px;
+  background: color-mix(in srgb, var(--bg) 70%, #000);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.earn-row.current .earn-track {
+  border-color: var(--amber);
+}
+.earn-fill {
+  height: 100%;
+  transition: width 500ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.earn-fill.ok {
+  background: var(--ok);
+}
+.earn-fill.owed {
+  background: var(--hot);
+  opacity: 0.9;
+}
+.earn-hrs {
+  font-size: 11px;
+  text-align: right;
+  color: var(--dim);
+}
+.earn-amt {
+  font-size: 12px;
+  text-align: right;
+}
+.earn-amt.ok {
+  color: var(--ok);
+}
+.earn-amt.owed {
+  color: var(--hot);
+}
+.earn-empty {
+  color: var(--dim);
+  font-size: 12px;
+  padding: 6px 2px;
+}
 @media (prefers-reduced-motion: reduce) {
   * {
     transition: none !important;
