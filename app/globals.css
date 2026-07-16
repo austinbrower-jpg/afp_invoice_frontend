@@ -956,12 +956,6 @@ body {
   align-items: center;
   gap: 14px;
 }
-.dial-foot {
-  font-size: 11px;
-  color: var(--dim);
-  letter-spacing: 0.04em;
-}
-
 /* manifest table */
 .manifest-scroll {
   overflow-x: auto;

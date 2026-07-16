@@ -16,5 +16,9 @@ describe("coerceSettings", () => {
       .toEqual({ theme: "station", layout: "invoice", dialMetric: "week" });
     expect(coerceSettings({ theme: "ion" }))
       .toEqual({ theme: "ion", layout: "balanced", dialMetric: "month" });
+    expect(coerceSettings({ theme: "ion", layout: "bogus", dialMetric: "today" }))
+      .toEqual({ theme: "ion", layout: "balanced", dialMetric: "today" });
+    expect(coerceSettings({ theme: "ion", layout: "invoice", dialMetric: "bogus" }))
+      .toEqual({ theme: "ion", layout: "invoice", dialMetric: "month" });
   });
 });

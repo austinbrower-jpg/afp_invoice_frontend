@@ -205,23 +205,43 @@ export default function Page() {
   );
 
   const dial = useMemo(() => {
-    const rest = { value: 0, unit: "h" as const, fillPercent: 0, foot: "of 60 h target", label: "Hours this month", ariaLabel: "dial at rest" };
-    if (!data || !today2) return rest;
     const m = settings.dialMetric;
+    // Label, unit, and foot are keyed off the selected metric, not off whether data has
+    // loaded yet, so the rest state (data not ready) never flips its wording once the
+    // real reading arrives.
+    const meta =
+      m === "today"
+        ? { label: "Hours today", unit: "h" as const, foot: "of 8 h day" }
+        : m === "week"
+        ? { label: "Hours this week", unit: "h" as const, foot: "of 40 h week" }
+        : m === "unbilled"
+        ? { label: "Unbilled", unit: "$" as const, foot: "0 sessions owed" }
+        : { label: "Hours this month", unit: "h" as const, foot: "of 60 h target" };
+
+    if (!data || !today2) {
+      return { value: 0, fillPercent: 0, ariaLabel: "dial at rest", ...meta };
+    }
     if (m === "today") {
       const h = dayReadout(data.hours, today2).hours;
-      return { value: h, unit: "h" as const, fillPercent: (h / 8) * 100, foot: "of 8 h day", label: "Hours today", ariaLabel: `${h.toFixed(1)} of 8 hours today` };
+      return { value: h, fillPercent: (h / 8) * 100, ariaLabel: `${h.toFixed(1)} of 8 hours today`, ...meta };
     }
     if (m === "week") {
       const h = weekReadout(data.hours, today2).hours;
-      return { value: h, unit: "h" as const, fillPercent: (h / 40) * 100, foot: "of 40 h week", label: "Hours this week", ariaLabel: `${h.toFixed(1)} of 40 hours this week` };
+      return { value: h, fillPercent: (h / 40) * 100, ariaLabel: `${h.toFixed(1)} of 40 hours this week`, ...meta };
     }
     if (m === "unbilled") {
       const u = unbilled(data, today2);
-      return { value: u.amount, unit: "$" as const, fillPercent: (u.hours / 60) * 100, foot: `${u.sessions} session${u.sessions === 1 ? "" : "s"} owed`, label: "Unbilled", ariaLabel: `${money(u.amount)} unbilled` };
+      return {
+        value: u.amount,
+        fillPercent: (u.hours / 60) * 100,
+        foot: `${u.sessions} session${u.sessions === 1 ? "" : "s"} owed`,
+        label: meta.label,
+        unit: meta.unit,
+        ariaLabel: `${money(u.amount)} unbilled`,
+      };
     }
     const h = monthReadout(data.hours, today2).hours;
-    return { value: h, unit: "h" as const, fillPercent: (h / 60) * 100, foot: "of 60 h target", label: "Hours this month", ariaLabel: `${h.toFixed(1)} of 60 hours this month` };
+    return { value: h, fillPercent: (h / 60) * 100, ariaLabel: `${h.toFixed(1)} of 60 hours this month`, ...meta };
   }, [settings.dialMetric, data, today2]);
 
   const runnerHours = selected.reduce((s, r) => s + roundHours(r.hours, round), 0);
