@@ -1615,14 +1615,42 @@ table.items .desc small {
   --amber: #b8bcc0; --hot: #c79a5a; --ok: #7e8286;
 }
 
-/* Overdrive: the badass one. Static CSS glow on the money and the worked figures, plus the
-   signal dots and fills. Static shadows (no animation), so they survive reduced motion. */
-:root[data-theme="overdrive"] .g.cash .v,
+/* Overdrive: the badass one, leveled up. All static CSS (glow + gradient + lit panels), scoped
+   to this theme and to the console (never the paper, never print). No animation, so nothing to
+   drop under reduced motion and zero perf cost. In this theme --amber is magenta and --ok cyan. */
+
+/* Gradient text on the hero figures (KPI values, dial value, running total). The glow is a
+   drop-shadow, not a text-shadow, so it shadows the gradient-clipped glyphs rather than
+   defaulting to the now-transparent text color. */
+:root[data-theme="overdrive"] .g .v,
+:root[data-theme="overdrive"] .gauge-value,
 :root[data-theme="overdrive"] .runner .row.total b {
-  text-shadow: 0 0 16px color-mix(in srgb, var(--hot) 75%, transparent);
+  background: linear-gradient(120deg, var(--amber), var(--ok));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 12px color-mix(in srgb, var(--amber) 55%, transparent));
 }
-:root[data-theme="overdrive"] .g.pri .v {
-  text-shadow: 0 0 14px color-mix(in srgb, var(--amber) 65%, transparent);
+
+/* Full neon spread: light up the instruments themselves, not just the figures. */
+:root[data-theme="overdrive"] .seg {
+  box-shadow: 0 0 8px color-mix(in srgb, var(--amber) 55%, transparent);
+}
+:root[data-theme="overdrive"] .seg.ov {
+  box-shadow: 0 0 8px color-mix(in srgb, var(--hot) 60%, transparent);
+}
+:root[data-theme="overdrive"] .gauge {
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--amber) 45%, transparent));
+}
+:root[data-theme="overdrive"] .gauge-needle {
+  box-shadow: 0 0 8px color-mix(in srgb, var(--ok) 70%, transparent);
+}
+:root[data-theme="overdrive"] .g.pri .fill,
+:root[data-theme="overdrive"] .g.cash .fill {
+  box-shadow: 0 0 8px color-mix(in srgb, var(--amber) 60%, transparent);
+}
+:root[data-theme="overdrive"] .sess.on::before {
+  box-shadow: 0 0 10px color-mix(in srgb, var(--amber) 70%, transparent);
 }
 :root[data-theme="overdrive"] .led-ready,
 :root[data-theme="overdrive"] .led-paid {
@@ -1630,6 +1658,21 @@ table.items .desc small {
 }
 :root[data-theme="overdrive"] .earn-fill.owed {
   box-shadow: 0 0 10px color-mix(in srgb, var(--hot) 60%, transparent);
+}
+:root[data-theme="overdrive"] .earn-fill.ok {
+  box-shadow: 0 0 8px color-mix(in srgb, var(--ok) 55%, transparent);
+}
+
+/* Lit panels: a faint magenta edge-glow so each module reads as powered. Kept low so it stays
+   atmospheric rather than garish. */
+:root[data-theme="overdrive"] .g,
+:root[data-theme="overdrive"] .mod,
+:root[data-theme="overdrive"] .dial-card,
+:root[data-theme="overdrive"] .runner,
+:root[data-theme="overdrive"] .flags,
+:root[data-theme="overdrive"] .invoice-summary {
+  box-shadow: 0 0 22px color-mix(in srgb, var(--amber) 10%, transparent);
+  border-color: color-mix(in srgb, var(--amber) 22%, var(--line));
 }
 
 /* ---------- settings panel ---------- */
