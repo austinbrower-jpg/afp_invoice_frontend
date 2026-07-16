@@ -39,6 +39,7 @@ import SessionManifest from "./cockpit/SessionManifest";
 import InvoiceControls from "./cockpit/InvoiceControls";
 import DataFlags from "./cockpit/DataFlags";
 import InvoicePaper, { type Entry } from "./cockpit/InvoicePaper";
+import { InvoiceSummary } from "./cockpit/InvoiceSummary";
 
 export default function Page() {
   // Notion stays synced through this hook: a background refetch on window focus and on a slow
@@ -328,6 +329,11 @@ export default function Page() {
         </aside>
 
         <main className="paperstage">
+          <InvoiceSummary
+            sessions={selected.length}
+            amount={runnerAmt}
+            onBuild={() => setLayout("invoice")}
+          />
           <InvoicePaper
             data={data} err={err} lines={lines} entries={entries}
             invno={invno} invdate={invdate} duedate={duedate} terms={terms}

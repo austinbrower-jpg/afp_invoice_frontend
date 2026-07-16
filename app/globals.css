@@ -1408,7 +1408,8 @@ table.items .desc small {
   .printwipe,
   .deck,
   .cockpit-top,
-  .cockpit-console {
+  .cockpit-console,
+  .invoice-summary {
     display: none !important;
   }
   .stage {
@@ -1701,6 +1702,22 @@ table.items .desc small {
 }
 :root[data-layout="instruments"] .invoice-summary { display: flex; }
 /* the summary card is display:none by default (Task 7), shown only here */
+
+/* Compact invoice summary: hidden by default, shown only under Instruments focus (Task 6). */
+.invoice-summary {
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+  align-self: start;
+  margin: 0 auto;
+  padding: 22px 26px;
+  background: var(--panel);
+  border: 1px solid var(--line-2);
+  border-radius: 12px;
+  min-width: 260px;
+}
+.isum-amt { font-size: 30px; color: var(--hot); line-height: 1; }
+.isum-sub { font-size: 12px; color: var(--dim); }
 
 @media (prefers-reduced-motion: reduce) {
   * {
