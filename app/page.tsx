@@ -31,6 +31,7 @@ import { useAfpData } from "./useAfpData";
 import { useCountUp } from "./useCountUp";
 import { useSettings } from "./useSettings";
 import { SyncStatus } from "./SyncStatus";
+import { SettingsPanel } from "./cockpit/SettingsPanel";
 import InstrumentCluster from "./cockpit/InstrumentCluster";
 import { HoursGauge } from "./dashboard/HoursGauge";
 import EarningsByWeek from "./cockpit/EarningsByWeek";
@@ -271,6 +272,12 @@ export default function Page() {
           </div>
         </div>
         <SyncStatus lastSynced={lastSynced} refreshing={refreshing} error={Boolean(err)} onRefresh={refresh} />
+        <SettingsPanel
+          settings={settings}
+          setTheme={setTheme}
+          setLayout={setLayout}
+          setDialMetric={setDialMetric}
+        />
         <button className="print-btn" onClick={savePdf} disabled={!lines.length}>
           Save PDF
         </button>
