@@ -214,6 +214,10 @@ export default function Page() {
 
   const [wiping, setWiping] = useState(false);
   const savePdf = () => {
+    // Nothing selected means the paper is showing the "pick sessions" prompt, not an invoice.
+    // Printing here produced a blank page. Refuse rather than save an empty PDF; the button is
+    // also disabled in this state, this guards the reduced-motion and programmatic paths too.
+    if (!lines.length) return;
     const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     if (reduce) {
       window.print();
@@ -247,7 +251,9 @@ export default function Page() {
           </div>
         </div>
         <SyncStatus lastSynced={lastSynced} refreshing={refreshing} error={Boolean(err)} onRefresh={refresh} />
-        <button className="print-btn" onClick={savePdf}>Save PDF</button>
+        <button className="print-btn" onClick={savePdf} disabled={!lines.length}>
+          Save PDF
+        </button>
       </div>
 
       <div className="cockpit-top">

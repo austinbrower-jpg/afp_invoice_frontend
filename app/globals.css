@@ -180,8 +180,14 @@ body {
   cursor: pointer;
   transition: filter 120ms ease;
 }
-.print-btn:hover {
+.print-btn:hover:not(:disabled) {
   filter: brightness(1.12);
+}
+/* Nothing selected: the paper is showing its "pick sessions" prompt, so there is no invoice
+   to save. Disable rather than let Save PDF print a blank page. */
+.print-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 /* ---------- layout ---------- */
@@ -378,8 +384,6 @@ body {
 }
 
 .runner {
-  position: sticky;
-  bottom: 0;
   margin-top: 14px;
   background: var(--panel);
   border: 1px solid var(--line-2);
@@ -1093,8 +1097,6 @@ table.manifest td.st {
   padding: 34px;
   display: flex;
   justify-content: center;
-  height: calc(100vh - 59px);
-  overflow-y: auto;
 }
 .paper {
   width: 8.5in;
@@ -1534,8 +1536,6 @@ table.items .desc small {
 }
 .cockpit-console {
   border-right: 1px solid var(--line);
-  height: calc(100vh - 59px);
-  overflow-y: auto;
   padding: 18px 16px 60px;
 }
 .cockpit-console h2 {
