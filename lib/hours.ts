@@ -218,3 +218,58 @@ export function unbilled(payload: Payload, today: string): Unbilled {
     since: validEnd ? payload.lastInvoice!.number : "this month",
   };
 }
+
+/* ---------- weekly earnings ---------- */
+
+// One row per calendar week for the earnings-by-week instrument. amount is collected + owed.
+// collected is money already on an invoice (Invoiced or Paid); owed is billable money not yet
+// invoiced. This is deliberately simpler than unbilled() above: it reports what was earned in
+// each week split by invoice state, and applies no date-window bound. The two answer different
+// questions and are not expected to match. See docs/superpowers/specs/2026-07-16-afp-station-cockpit-design.md.
+export type WeekEarning = {
+  weekStart: string; // ISO Monday
+  hours: number; // billable, non-superseded
+  amount: number; // collected + owed
+  collected: number; // dollars from Invoiced or Paid sessions
+  owed: number; // dollars from billable sessions not yet invoiced
+  isCurrent: boolean;
+};
+
+export function weeklyEarnings(payload: Payload, today: string, weeks = 6): WeekEarning[] {
+  const currentWeek = startOfWeekISO(today);
+  const byWeek = new Map<string, WeekEarning>();
+
+  const ensure = (weekStart: string): WeekEarning => {
+    let w = byWeek.get(weekStart);
+    if (!w) {
+      w = {
+        weekStart,
+        hours: 0,
+        amount: 0,
+        collected: 0,
+        owed: 0,
+        isCurrent: weekStart === currentWeek,
+      };
+      byWeek.set(weekStart, w);
+    }
+    return w;
+  };
+
+  // Always surface the current week, even at zero, so the instrument renders at rest.
+  ensure(currentWeek);
+
+  for (const s of payload.hours) {
+    if (!isLive(s)) continue; // drops superseded and non-billable
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(s.date)) continue;
+    const w = ensure(startOfWeekISO(s.date));
+    const dollars = s.hours * s.rate;
+    w.hours += s.hours;
+    w.amount += dollars;
+    if (BILLED_STATUSES.has(s.status)) w.collected += dollars;
+    else w.owed += dollars;
+  }
+
+  return [...byWeek.values()]
+    .sort((a, b) => (a.weekStart < b.weekStart ? 1 : a.weekStart > b.weekStart ? -1 : 0))
+    .slice(0, weeks);
+}
