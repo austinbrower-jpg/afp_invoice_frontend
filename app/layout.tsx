@@ -25,6 +25,20 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Saira:wght@400;500;600;700&display=swap"
           rel="stylesheet"
         />
+        {/* Applies the saved theme and layout before paint so there is no flash of the default.
+            Runs before React hydrates; React does not manage these attributes, so no mismatch.
+            Fails safe to the defaults. Kept in sync with app/useSettings.ts. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{var s=JSON.parse(localStorage.getItem('afp.cockpit.settings.v1')||'{}');" +
+              "var t=['station','ion','ember','daylight','overdrive','mono'];" +
+              "var l=['balanced','invoice','instruments'];" +
+              "document.documentElement.dataset.theme=t.indexOf(s.theme)>=0?s.theme:'station';" +
+              "document.documentElement.dataset.layout=l.indexOf(s.layout)>=0?s.layout:'balanced';" +
+              "}catch(e){document.documentElement.dataset.theme='station';document.documentElement.dataset.layout='balanced';}",
+          }}
+        />
       </head>
       <body>{children}</body>
     </html>
