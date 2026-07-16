@@ -499,6 +499,120 @@ body {
   }
 }
 
+/* ---------- dashboard ---------- */
+.dashboard-main {
+  padding: 40px;
+  display: flex;
+  justify-content: center;
+}
+.dash-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 24px 32px 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+.dash-error {
+  color: var(--dim);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.dash-error b {
+  color: var(--tx);
+  display: block;
+  margin-bottom: 6px;
+}
+.dash-error .hint {
+  margin-top: 8px;
+  font-family: var(--data);
+  font-size: 11px;
+  border-left: 2px solid var(--amber);
+  padding: 8px 10px;
+  background: var(--panel);
+}
+
+/* ---------- hours gauge ----------
+   docs/10-visual-direction.md, Motion and character. A circular dial, hours-this-month
+   as a needle sweeping toward a monthly target. One custom property drives both the
+   conic-gradient fill and the needle's rotation, so they can never disagree.
+
+   Registering --fill-percent as a typed <number> is what makes `transition` interpolate
+   it smoothly. An unregistered custom property is opaque to the transition engine and
+   would jump instead of easing, silently defeating the entire point of this section. */
+@property --fill-percent {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+.gauge {
+  --fill-percent: 0;
+  position: relative;
+  width: 200px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: conic-gradient(
+    var(--amber) calc(var(--fill-percent) * 1%),
+    var(--line) 0
+  );
+  transition: --fill-percent 700ms cubic-bezier(0.16, 1, 0.3, 1);
+  display: grid;
+  place-items: center;
+}
+.gauge-face {
+  position: absolute;
+  inset: 14px;
+  border-radius: 50%;
+  background: var(--panel);
+  display: grid;
+  place-items: center;
+  text-align: center;
+}
+.gauge-value {
+  font-family: var(--data);
+  font-variant-numeric: tabular-nums;
+  font-size: 26px;
+  color: var(--tx);
+  line-height: 1;
+}
+.gauge-unit {
+  font-size: 13px;
+  color: var(--dim);
+  margin-left: 2px;
+}
+.gauge-target {
+  margin-top: 6px;
+  font-family: var(--data);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dim-2);
+}
+/* Pivots from the dial's exact center. The needle's own bottom edge sits at that
+   center point and it extends upward, so at rest (0%, rotate(0)) it points straight up,
+   matching the top-and-clockwise convention conic-gradient fills with. Rotation maps
+   0-100 to a full 0-360deg sweep, so the needle and the fill arc always agree. */
+.gauge-needle {
+  position: absolute;
+  bottom: 50%;
+  left: 50%;
+  width: 3px;
+  height: 40%;
+  background: var(--tx);
+  border-radius: 2px;
+  transform-origin: bottom center;
+  transform: translateX(-50%) rotate(calc(var(--fill-percent) * 3.6deg));
+  z-index: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .gauge {
+    transition: none;
+  }
+}
+
 /* ---------- paper ---------- */
 .paperstage {
   padding: 34px;
