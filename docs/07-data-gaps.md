@@ -45,24 +45,21 @@ Flagged in the UI. Not blocking.
 
 ## 4. No billing identity anywhere
 
-**Blocks sending a real invoice.** Narrower than it was: the entity question in
-`09-brand.md` is decided (Battle Bound Branding LLC), so the remit-to side is a known
-constant, not an unknown. What is still missing is AFP's side.
+**Partially closed 2026-07-16.** `Billing Address`, `AP Contact`, and `Payment Terms`
+properties now exist on the Clients data source. `Billing Address` is filled in for
+Anytime Fuel Pros: `18325 Bracken Dr, San Antonio, TX 78266`, confirmed with a live query
+after writing it. `AP Contact` and `Payment Terms` are still empty, nobody has supplied
+a contact name or confirmed terms yet, though the existing invoice AFP-2026-001 already
+used Net 15 in practice, worth using as the default once someone decides to make it
+official rather than incidental.
 
-Nothing in Notion stores:
+Still blocks sending a real invoice until AP Contact is filled in, since AP will not
+process an invoice addressed to a company with no named contact. Once that's added, this
+gap is fully closed.
 
-- AFP's billing address and AP contact
-- Payment instructions
-
-The prototype makes those blocks editable directly on the paper as a stopgap, and the
-edits do not persist. That is fine for testing and wrong for a document you send twice a
-month.
-
-Fix: add `Billing Address`, `AP Contact`, and `Payment Terms` properties to the Client row
-in Notion. Verified live on 2026-07-15: the Client row (`Anytime Fuel Pros`) currently
-has no such properties, only `Name`, `Default Hourly Rate`, `Timezone`, `Status`, `Color`,
-and `Notes`. Keep the BBB remit-to block as a constant in the repo since it is yours, not
-the client's, and does not belong in Notion.
+The remit-to side is separate and does not go here: Battle Bound Branding LLC's address
+is a repo constant per `09-brand.md`, since it is yours, not the client's, and doesn't
+belong in Notion.
 
 ## 5. Inconsistent time formats
 
