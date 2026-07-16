@@ -9,6 +9,7 @@
 // anything here is a change to the deliverable.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import type { Payload, Session } from "@/lib/notion";
 import {
   addDays,
@@ -19,6 +20,10 @@ import {
   shortDate,
   todayISO,
 } from "@/lib/invoice";
+import { useAfpData } from "./useAfpData";
+import { useCountUp } from "./useCountUp";
+import { SyncStatus } from "./SyncStatus";
+import { StatusLed } from "./StatusLed";
 
 type Mode = "invoice" | "summary" | "notes" | "none";
 
@@ -27,8 +32,10 @@ type Mode = "invoice" | "summary" | "notes" | "none";
 type Entry = { h: string; stamp: string; body: string; key: string };
 
 export default function Page() {
-  const [data, setData] = useState<Payload | null>(null);
-  const [err, setErr] = useState<{ error: string; hint?: string } | null>(null);
+  // Notion stays synced through this hook: a background refetch on window focus and on a slow
+  // interval, plus a manual refresh, all hitting the same 60s-cached route. It replaces the
+  // one-shot boot fetch this component used to own. See app/useAfpData.ts.
+  const { data, error: err, lastSynced, refreshing, refresh } = useAfpData();
 
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -43,44 +50,25 @@ export default function Page() {
   const [showall, setShowall] = useState(false);
   const [showsid, setShowsid] = useState(true);
 
-  /* ---------- boot: default to everything not yet invoiced ---------- */
+  /* ---------- boot: default to everything not yet invoiced ----------
+     Runs exactly once, when the first payload arrives. Later background refreshes from
+     useAfpData replace `data` and flow through the memos below, but must never re-run this:
+     a poll landing mid-edit would otherwise wipe the range and reset the selection, which is
+     how you bill the wrong week. Opens ready per docs/06-ui-spec.md: the day after the last
+     invoice through today, every eligible session pre-selected, zero clicks before Cmd+P. */
+  const booted = useRef(false);
   useEffect(() => {
-    let live = true;
-    fetch("/api/notion/afp")
-      .then(async (r) => {
-        const body = await r.json();
-        if (!r.ok) throw body;
-        return body as Payload;
-      })
-      .then((d) => {
-        if (!live) return;
-        const today = todayISO();
-        // Opens ready: the day after the last invoice through today, every eligible
-        // session pre-selected. The common case is "bill me for everything since last
-        // time" and it should take zero clicks before Cmd+P. See docs/06-ui-spec.md.
-        const start = d.lastInvoice
-          ? addDays(d.lastInvoice.periodEnd, 1)
-          : today.slice(0, 8) + "01";
-        setData(d);
-        setInvno(nextInvoiceNumber(d.lastInvoice?.number));
-        setInvdate(today);
-        setDuedate(addDays(today, 15));
-        setFrom(start);
-        setTo(today);
-        setPicked(autoSelect(d.hours, start, today, false));
-      })
-      .catch((e) => {
-        if (!live) return;
-        setErr(
-          e && typeof e === "object" && "error" in e
-            ? (e as { error: string; hint?: string })
-            : { error: "Could not reach /api/notion/afp.", hint: String(e) }
-        );
-      });
-    return () => {
-      live = false;
-    };
-  }, []);
+    if (!data || booted.current) return;
+    booted.current = true;
+    const today = todayISO();
+    const start = unbilledStart(data, today);
+    setInvno(nextInvoiceNumber(data.lastInvoice?.number));
+    setInvdate(today);
+    setDuedate(addDays(today, 15));
+    setFrom(start);
+    setTo(today);
+    setPicked(autoSelect(data.hours, start, today, false));
+  }, [data]);
 
   /* ---------- selection ---------- */
   // Any range change clears and re-runs auto-select. Keeping stale selections from a
@@ -99,12 +87,16 @@ export default function Page() {
     () => rows.filter((r) => inRange(r, from, to) && eligible(r, showall)),
     [rows, from, to, showall]
   );
+  // Only rows that are picked AND still in range AND still eligible under the current showall
+  // are billed. Without the eligibility re-check, checking a superseded row with "Show
+  // non-billable and superseded" on, then turning it off, would hide the row while it stayed
+  // on the invoice and in the total, with no way to see or uncheck it. See docs/06-ui-spec.md.
   const selected = useMemo(
     () =>
       rows
-        .filter((r) => picked.has(r.url))
+        .filter((r) => picked.has(r.url) && inRange(r, from, to) && eligible(r, showall))
         .sort((a, b) => a.date.localeCompare(b.date) || a.sid.localeCompare(b.sid)),
-    [rows, picked]
+    [rows, picked, from, to, showall]
   );
 
   const toggle = (url: string) =>
@@ -118,11 +110,7 @@ export default function Page() {
   const preset = (p: string) => {
     if (!data) return;
     const today = todayISO();
-    if (p === "unbilled")
-      setRange(
-        data.lastInvoice ? addDays(data.lastInvoice.periodEnd, 1) : today.slice(0, 8) + "01",
-        today
-      );
+    if (p === "unbilled") setRange(unbilledStart(data, today), today);
     if (p === "week") setRange(addDays(today, -6), today);
     if (p === "month") setRange(today.slice(0, 8) + "01", today);
     if (p === "all") setRange(today.slice(0, 4) + "-01-01", today);
@@ -168,9 +156,12 @@ export default function Page() {
         const hrs = lines
           .filter((l) => l.work.includes(id))
           .reduce((s, l) => s + l.billed, 0);
+        const stamped = fmtDate(w.date);
         return {
           h: w.title,
-          stamp: `${fmtDate(w.date)} · ${hrs.toFixed(2)} h`,
+          stamp: stamped
+            ? `${stamped} · ${hrs.toFixed(2)} h`
+            : `${hrs.toFixed(2)} h`,
           body: mode === "summary" ? w.summary : w.invoice,
           key: w.date,
         };
@@ -220,6 +211,9 @@ export default function Page() {
           <b>Invoice Builder</b>
           <span>{data?.client.name ?? "Anytime Fuel Pros"}</span>
         </div>
+        <Link href="/dashboard" className="chip">
+          Dashboard
+        </Link>
         <div className="rangebox">
           <label htmlFor="from">From</label>
           <input
@@ -250,6 +244,12 @@ export default function Page() {
             </button>
           </div>
         </div>
+        <SyncStatus
+          lastSynced={lastSynced}
+          refreshing={refreshing}
+          error={Boolean(err)}
+          onRefresh={refresh}
+        />
         <button className="print-btn" onClick={savePdf}>
           Save PDF
         </button>
@@ -277,7 +277,7 @@ export default function Page() {
                       <span className="h">{dayH ? dayH.toFixed(2) + " h" : "—"}</span>
                     </div>
                     {dayRows.map((r) => {
-                      const locked = r.status === "Invoiced" || r.status === "Superseded";
+                      const locked = isTerminal(r.status);
                       return (
                         <label
                           className={`sess ${picked.has(r.url) ? "on" : ""} ${
@@ -440,7 +440,11 @@ export default function Page() {
 
         <main className="paperstage">
           <div className="paper">
-            {err ? (
+            {err && !data ? (
+              // Only a cold failure with nothing to show takes over the paper. A background
+              // refresh that fails while an invoice is already on screen keeps the invoice
+              // and reports the failure through the sync pill, rather than yanking the
+              // document out from under an edit.
               <div className="loadstate">
                 <b>Notion read failed.</b>
                 {err.error}
@@ -504,7 +508,7 @@ export default function Page() {
                 <div className="period">
                   <span>Service period</span>
                   <b>
-                    {fmtDate(lines[0].date)} — {fmtDate(lines[lines.length - 1].date)}
+                    {fmtDate(lines[0].date)} – {fmtDate(lines[lines.length - 1].date)}
                   </b>
                 </div>
 
@@ -592,11 +596,31 @@ export default function Page() {
 const byDayDesc = (a: Session, b: Session) =>
   b.date.localeCompare(a.date) || a.sid.localeCompare(b.sid);
 
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
 const inRange = (r: Session, from: string, to: string) => r.date >= from && r.date <= to;
 
-// Eligible means Billable is true and status is neither Invoiced nor Superseded. The
-// toggle reveals the excluded rows greyed rather than hiding them, because a missing
-// session should never look like data loss. See docs/06-ui-spec.md.
+// Statuses that must never land on a new invoice. Invoiced and Paid are both already on an
+// invoice, so re-billing either double bills; Superseded is a dead duplicate. One set so
+// eligible, autoSelect, the row lock, and buildFlags cannot drift apart, which is exactly
+// how Paid was getting silently pre-selected before. See docs/03-notion-schema.md for the
+// full Billing Status list.
+const BILLED_STATUSES = new Set(["Invoiced", "Paid"]);
+const isTerminal = (status: string): boolean =>
+  BILLED_STATUSES.has(status) || status === "Superseded";
+
+// The day after the last invoice's period, or the month start when there is no last invoice
+// or its Period End is empty or unreadable. Guarding the date keeps addDays from emitting a
+// "NaN-NaN-NaN" range that would sort every session out and pre-select nothing.
+const unbilledStart = (data: Payload, today: string): string =>
+  data.lastInvoice && ISO_DATE.test(data.lastInvoice.periodEnd)
+    ? addDays(data.lastInvoice.periodEnd, 1)
+    : today.slice(0, 8) + "01";
+
+// Eligible means Billable is true and the status is not Superseded. The toggle reveals the
+// excluded rows greyed rather than hiding them, because a missing session should never look
+// like data loss. Invoiced and Paid rows stay visible but locked, so you can see they exist
+// without being able to re-bill them. See docs/06-ui-spec.md.
 const eligible = (r: Session, showall: boolean) =>
   showall ? true : r.billable && r.status !== "Superseded";
 
@@ -604,86 +628,9 @@ function autoSelect(hours: Session[], from: string, to: string, showall: boolean
   const next = new Set<string>();
   hours
     .filter((r) => inRange(r, from, to) && eligible(r, showall))
-    .filter((r) => r.billable && r.status !== "Invoiced" && r.status !== "Superseded")
+    .filter((r) => r.billable && !isTerminal(r.status))
     .forEach((r) => next.add(r.url));
   return next;
-}
-
-// Billing Status as a signal light rather than a text pill, per docs/10. Ring versus
-// fill carries the meaning, not colour alone. The status name stays as a plain label
-// next to it: the LED is the signal, the word is what makes it readable and what a
-// screen reader gets. Unknown statuses fall back to the Draft ring rather than
-// disappearing, because a status we do not recognise is still a status.
-const LED_CLASS: Record<string, string> = {
-  Draft: "led-draft",
-  Reviewed: "led-reviewed",
-  "Ready to Invoice": "led-ready",
-  Invoiced: "led-invoiced",
-  Paid: "led-paid",
-  Superseded: "led-superseded",
-};
-
-function StatusLed({ status }: { status: string }) {
-  const cls = LED_CLASS[status] ?? "led-draft";
-  return <span className={`led ${cls}`} role="img" aria-label={`Status: ${status}`} />;
-}
-
-// Bounded count-up: steps the displayed value for a fixed ~240ms after a change and
-// stops. Not a persistent render loop, which is what docs/10's Performance section
-// actually prohibits. Drops out under reduced motion, where the value simply snaps.
-//
-// The number this animates is the amount you are about to charge someone, so the
-// animation is never allowed to be the reason it is wrong. requestAnimationFrame does
-// not fire in a hidden or backgrounded tab, which would strand the display on its
-// starting value: the total read $0.00 while the real figure was $647.70. So the target
-// is guaranteed three ways: snap immediately if the page is hidden or motion is
-// reduced, a guard timer that lands the value even if no frame ever runs, and a final
-// settle on teardown. Motion is the garnish; the figure is the point.
-function useCountUp(target: number, ms = 240): number {
-  const [shown, setShown] = useState(target);
-  const fromRef = useRef(target);
-
-  useEffect(() => {
-    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    const from = fromRef.current;
-
-    if (reduce || document.hidden || from === target) {
-      fromRef.current = target;
-      setShown(target);
-      return;
-    }
-
-    let raf: number | null = null;
-    let settled = false;
-    const settle = () => {
-      if (settled) return;
-      settled = true;
-      fromRef.current = target;
-      setShown(target);
-    };
-
-    const start = performance.now();
-    const tick = (now: number) => {
-      const t = Math.min(1, (now - start) / ms);
-      const e = 1 - Math.pow(1 - t, 3); // ease-out: moves, then settles
-      if (t < 1) {
-        setShown(from + (target - from) * e);
-        raf = requestAnimationFrame(tick);
-      } else settle();
-    };
-    raf = requestAnimationFrame(tick);
-
-    // Backstop. If no frame ever runs, this still lands the true value.
-    const guard = window.setTimeout(settle, ms + 120);
-
-    return () => {
-      if (raf !== null) cancelAnimationFrame(raf);
-      window.clearTimeout(guard);
-      settle();
-    };
-  }, [target, ms]);
-
-  return shown;
 }
 
 // The panel names specific problems in the current selection, not generic warnings.
@@ -711,12 +658,26 @@ function buildFlags(data: Payload, rows: Session[]): string[] {
       f.push(`Work Done "<b>${esc(w.title)}</b>" is still <b>${esc(w.approval)}</b>, not Approved.`);
   });
   rows
-    .filter((r) => r.status === "Invoiced")
+    .filter((r) => BILLED_STATUSES.has(r.status))
     .forEach((r) =>
       f.push(
-        `<b>${esc(r.sid)}</b> is already marked <b>Invoiced</b>${
+        `<b>${esc(r.sid)}</b> is already marked <b>${esc(r.status)}</b>${
           data.lastInvoice ? ` (on ${esc(data.lastInvoice.number)})` : ""
         }. Double billing risk.`
+      )
+    );
+  rows
+    .filter((r) => r.status === "Superseded")
+    .forEach((r) =>
+      f.push(
+        `<b>${esc(r.sid)}</b> is <b>Superseded</b>, a dead duplicate that must not be billed.`
+      )
+    );
+  rows
+    .filter((r) => r.hours <= 0)
+    .forEach((r) =>
+      f.push(
+        `<b>${esc(r.sid)}</b> has no hours logged (Total Hours is empty or zero), so it prints as a $0.00 line.`
       )
     );
   rows

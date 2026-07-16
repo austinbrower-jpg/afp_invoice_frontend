@@ -10,7 +10,13 @@ export const money = (n: number): string =>
     maximumFractionDigits: 2,
   });
 
+// Hours dates are validated upstream (assertDatesUsable), but Work Done dates are not, so a
+// blank one must format to "" rather than the string "Invalid Date". Callers that build a
+// stamp check for the empty result and drop the date segment.
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
 export const fmtDate = (iso: string): string => {
+  if (!ISO_DATE.test(iso)) return "";
   const [y, m, d] = iso.split("-").map(Number);
   return new Date(y, m - 1, d).toLocaleDateString("en-US", {
     month: "short",
@@ -20,6 +26,7 @@ export const fmtDate = (iso: string): string => {
 };
 
 export const shortDate = (iso: string): string => {
+  if (!ISO_DATE.test(iso)) return "";
   const [y, m, d] = iso.split("-").map(Number);
   return new Date(y, m - 1, d).toLocaleDateString("en-US", {
     month: "short",
