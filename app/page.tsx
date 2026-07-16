@@ -26,23 +26,27 @@ import {
   unbilledStart,
   type Mode,
 } from "@/lib/selection";
-import { weeklyEarnings, monthReadout } from "@/lib/hours";
+import { weeklyEarnings, dayReadout, weekReadout, monthReadout, unbilled } from "@/lib/hours";
 import { useAfpData } from "./useAfpData";
 import { useCountUp } from "./useCountUp";
+import { useSettings } from "./useSettings";
 import { SyncStatus } from "./SyncStatus";
-import InstrumentCluster, { MONTHLY_TARGET_HOURS } from "./cockpit/InstrumentCluster";
+import { SettingsPanel } from "./cockpit/SettingsPanel";
+import InstrumentCluster from "./cockpit/InstrumentCluster";
 import { HoursGauge } from "./dashboard/HoursGauge";
 import EarningsByWeek from "./cockpit/EarningsByWeek";
 import SessionManifest from "./cockpit/SessionManifest";
 import InvoiceControls from "./cockpit/InvoiceControls";
 import DataFlags from "./cockpit/DataFlags";
 import InvoicePaper, { type Entry } from "./cockpit/InvoicePaper";
+import { InvoiceSummary } from "./cockpit/InvoiceSummary";
 
 export default function Page() {
   // Notion stays synced through this hook: a background refetch on window focus and on a slow
   // interval, plus a manual refresh, all hitting the same 60s-cached route. It replaces the
   // one-shot boot fetch this component used to own. See app/useAfpData.ts.
   const { data, error: err, lastSynced, refreshing, refresh } = useAfpData();
+  const { settings, setTheme, setLayout, setDialMetric } = useSettings();
 
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -200,7 +204,45 @@ export default function Page() {
     [data, today2]
   );
 
-  const monthHours = data && today2 ? monthReadout(data.hours, today2).hours : 0;
+  const dial = useMemo(() => {
+    const m = settings.dialMetric;
+    // Label, unit, and foot are keyed off the selected metric, not off whether data has
+    // loaded yet, so the rest state (data not ready) never flips its wording once the
+    // real reading arrives.
+    const meta =
+      m === "today"
+        ? { label: "Hours today", unit: "h" as const, foot: "of 8 h day" }
+        : m === "week"
+        ? { label: "Hours this week", unit: "h" as const, foot: "of 40 h week" }
+        : m === "unbilled"
+        ? { label: "Unbilled", unit: "$" as const, foot: "0 sessions owed" }
+        : { label: "Hours this month", unit: "h" as const, foot: "of 60 h target" };
+
+    if (!data || !today2) {
+      return { value: 0, fillPercent: 0, ariaLabel: "dial at rest", ...meta };
+    }
+    if (m === "today") {
+      const h = dayReadout(data.hours, today2).hours;
+      return { value: h, fillPercent: (h / 8) * 100, ariaLabel: `${h.toFixed(1)} of 8 hours today`, ...meta };
+    }
+    if (m === "week") {
+      const h = weekReadout(data.hours, today2).hours;
+      return { value: h, fillPercent: (h / 40) * 100, ariaLabel: `${h.toFixed(1)} of 40 hours this week`, ...meta };
+    }
+    if (m === "unbilled") {
+      const u = unbilled(data, today2);
+      return {
+        value: u.amount,
+        fillPercent: (u.hours / 60) * 100,
+        foot: `${u.sessions} session${u.sessions === 1 ? "" : "s"} owed`,
+        label: meta.label,
+        unit: meta.unit,
+        ariaLabel: `${money(u.amount)} unbilled`,
+      };
+    }
+    const h = monthReadout(data.hours, today2).hours;
+    return { value: h, fillPercent: (h / 60) * 100, ariaLabel: `${h.toFixed(1)} of 60 hours this month`, ...meta };
+  }, [settings.dialMetric, data, today2]);
 
   const runnerHours = selected.reduce((s, r) => s + roundHours(r.hours, round), 0);
   const runnerAmt = selected.reduce((s, r) => s + roundHours(r.hours, round) * r.rate, 0);
@@ -214,6 +256,10 @@ export default function Page() {
 
   const [wiping, setWiping] = useState(false);
   const savePdf = () => {
+    // Nothing selected means the paper is showing the "pick sessions" prompt, not an invoice.
+    // Printing here produced a blank page. Refuse rather than save an empty PDF; the button is
+    // also disabled in this state, this guards the reduced-motion and programmatic paths too.
+    if (!lines.length) return;
     const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     if (reduce) {
       window.print();
@@ -247,7 +293,15 @@ export default function Page() {
           </div>
         </div>
         <SyncStatus lastSynced={lastSynced} refreshing={refreshing} error={Boolean(err)} onRefresh={refresh} />
-        <button className="print-btn" onClick={savePdf}>Save PDF</button>
+        <SettingsPanel
+          settings={settings}
+          setTheme={setTheme}
+          setLayout={setLayout}
+          setDialMetric={setDialMetric}
+        />
+        <button className="print-btn" onClick={savePdf} disabled={!lines.length}>
+          Save PDF
+        </button>
       </div>
 
       <div className="cockpit-top">
@@ -257,11 +311,14 @@ export default function Page() {
       <div className="cockpit-split">
         <aside className="cockpit-console">
           <div className="dial-card">
-            <h2 className="eyebrow">Hours this month</h2>
-            <HoursGauge hours={monthHours} target={MONTHLY_TARGET_HOURS} />
-            <div className="dial-foot mono">
-              {monthHours.toFixed(1)} / {MONTHLY_TARGET_HOURS} h target
-            </div>
+            <h2 className="eyebrow">{dial.label}</h2>
+            <HoursGauge
+              value={dial.value}
+              unit={dial.unit}
+              fillPercent={dial.fillPercent}
+              foot={dial.foot}
+              ariaLabel={dial.ariaLabel}
+            />
           </div>
 
           <h2>Sessions in range</h2>
@@ -273,7 +330,7 @@ export default function Page() {
             <div className="row total"><span>Amount</span><b className="mono">{money(shownAmt)}</b></div>
           </div>
 
-          <h2>Earnings by week</h2>
+          <h2 className="earn-h">Earnings by week</h2>
           <EarningsByWeek weeks={weeks} />
 
           <h2>Invoice</h2>
@@ -292,6 +349,11 @@ export default function Page() {
         </aside>
 
         <main className="paperstage">
+          <InvoiceSummary
+            sessions={selected.length}
+            amount={runnerAmt}
+            onBuild={() => setLayout("invoice")}
+          />
           <InvoicePaper
             data={data} err={err} lines={lines} entries={entries}
             invno={invno} invdate={invdate} duedate={duedate} terms={terms}

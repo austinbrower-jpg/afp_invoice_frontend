@@ -180,8 +180,14 @@ body {
   cursor: pointer;
   transition: filter 120ms ease;
 }
-.print-btn:hover {
+.print-btn:hover:not(:disabled) {
   filter: brightness(1.12);
+}
+/* Nothing selected: the paper is showing its "pick sessions" prompt, so there is no invoice
+   to save. Disable rather than let Save PDF print a blank page. */
+.print-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 /* ---------- layout ---------- */
@@ -378,8 +384,6 @@ body {
 }
 
 .runner {
-  position: sticky;
-  bottom: 0;
   margin-top: 14px;
   background: var(--panel);
   border: 1px solid var(--line-2);
@@ -952,12 +956,6 @@ body {
   align-items: center;
   gap: 14px;
 }
-.dial-foot {
-  font-size: 11px;
-  color: var(--dim);
-  letter-spacing: 0.04em;
-}
-
 /* manifest table */
 .manifest-scroll {
   overflow-x: auto;
@@ -1093,8 +1091,6 @@ table.manifest td.st {
   padding: 34px;
   display: flex;
   justify-content: center;
-  height: calc(100vh - 59px);
-  overflow-y: auto;
 }
 .paper {
   width: 8.5in;
@@ -1406,7 +1402,8 @@ table.items .desc small {
   .printwipe,
   .deck,
   .cockpit-top,
-  .cockpit-console {
+  .cockpit-console,
+  .invoice-summary {
     display: none !important;
   }
   .stage {
@@ -1534,8 +1531,6 @@ table.items .desc small {
 }
 .cockpit-console {
   border-right: 1px solid var(--line);
-  height: calc(100vh - 59px);
-  overflow-y: auto;
   padding: 18px 16px 60px;
 }
 .cockpit-console h2 {
@@ -1586,6 +1581,137 @@ table.items .desc small {
     margin-bottom: 0;
   }
 }
+
+/* ---------- themes ----------
+   Each theme overrides the console token values keyed on the root data-theme attribute. The
+   semantic names stay: --amber is worked, --hot is money owed, --ok is settled. So e.g. Ion sets
+   --amber to a cyan on purpose (renaming every token across all components is out of scope). No
+   theme touches the paper tokens; the paper is a separate system. Station is the base default in
+   the .station rule above, so it needs no block here. See the customization spec. */
+
+:root[data-theme="ion"] .station {
+  --bg: #080b12; --panel: #0f1620; --line: #1c2a38; --line-2: #2a3d50;
+  --tx: #c6d6e6; --dim: #5e7180; --dim-2: #3e4c58;
+  --amber: #38bdf8; --hot: #fb7185; --ok: #34d399;
+}
+:root[data-theme="ember"] .station {
+  --bg: #0e0a08; --panel: #1a1310; --line: #33241c; --line-2: #4a362a;
+  --tx: #e6d5c6; --dim: #8a7160; --dim-2: #5c4b3e;
+  --amber: #fbbf24; --hot: #e11d48; --ok: #2dd4bf;
+}
+:root[data-theme="daylight"] .station {
+  --bg: #f4f5f7; --panel: #ffffff; --line: #d8dce2; --line-2: #c2c8d0;
+  --tx: #1a1f26; --dim: #6b7480; --dim-2: #9aa1ab;
+  --amber: #b45309; --hot: #dc2626; --ok: #059669;
+}
+:root[data-theme="overdrive"] .station {
+  --bg: #070510; --panel: #130a26; --line: #2e1a50; --line-2: #452870;
+  --tx: #ece4ff; --dim: #8778b0; --dim-2: #5e5488;
+  --amber: #ff2e97; --hot: #ff3b57; --ok: #2ef2ff;
+}
+:root[data-theme="mono"] .station {
+  --bg: #0c0d0e; --panel: #141516; --line: #26282a; --line-2: #3a3d40;
+  --tx: #d4d6d8; --dim: #6a6e72; --dim-2: #4a4d50;
+  --amber: #b8bcc0; --hot: #c79a5a; --ok: #7e8286;
+}
+
+/* Overdrive: the badass one. Static CSS glow on the money and the worked figures, plus the
+   signal dots and fills. Static shadows (no animation), so they survive reduced motion. */
+:root[data-theme="overdrive"] .g.cash .v,
+:root[data-theme="overdrive"] .runner .row.total b {
+  text-shadow: 0 0 16px color-mix(in srgb, var(--hot) 75%, transparent);
+}
+:root[data-theme="overdrive"] .g.pri .v {
+  text-shadow: 0 0 14px color-mix(in srgb, var(--amber) 65%, transparent);
+}
+:root[data-theme="overdrive"] .led-ready,
+:root[data-theme="overdrive"] .led-paid {
+  box-shadow: 0 0 8px color-mix(in srgb, var(--ok) 70%, transparent);
+}
+:root[data-theme="overdrive"] .earn-fill.owed {
+  box-shadow: 0 0 10px color-mix(in srgb, var(--hot) 60%, transparent);
+}
+
+/* ---------- settings panel ---------- */
+.settings { position: relative; }
+.gear {
+  display: grid; place-items: center; width: 34px; height: 34px;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--panel);
+  color: var(--dim); cursor: pointer; font-size: 16px;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+.gear:hover { color: var(--tx); border-color: var(--amber); }
+.settings-pop {
+  position: absolute; top: 42px; right: 0; z-index: 40; width: 260px;
+  background: var(--panel); border: 1px solid var(--line-2); border-radius: 10px;
+  padding: 14px; display: flex; flex-direction: column; gap: 16px;
+  box-shadow: 0 12px 40px rgba(0,0,0,.5);
+}
+.set-group { display: flex; flex-direction: column; gap: 8px; }
+.set-swatches { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+.swatch {
+  aspect-ratio: 1; border-radius: 6px; border: 1px solid var(--line); cursor: pointer;
+  transition: transform 120ms ease;
+}
+.swatch:hover { transform: scale(1.1); }
+.swatch.on { outline: 2px solid var(--amber); outline-offset: 1px; }
+.sw-station { background: #0a0c10; box-shadow: inset 0 -6px 0 #f0a93b; }
+.sw-ion { background: #080b12; box-shadow: inset 0 -6px 0 #38bdf8; }
+.sw-ember { background: #0e0a08; box-shadow: inset 0 -6px 0 #fbbf24; }
+.sw-daylight { background: #f4f5f7; box-shadow: inset 0 -6px 0 #b45309; }
+.sw-overdrive { background: #070510; box-shadow: inset 0 -6px 0 #ff2e97; }
+.sw-mono { background: #0c0d0e; box-shadow: inset 0 -6px 0 #b8bcc0; }
+.set-rows { display: flex; flex-direction: column; gap: 4px; }
+.set-row {
+  text-align: left; padding: 7px 10px; border-radius: 6px; cursor: pointer;
+  background: transparent; border: 1px solid var(--line); color: var(--dim);
+  font-family: var(--ui); font-size: 12px;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+.set-row:hover { color: var(--tx); }
+.set-row.on { color: var(--tx); border-color: var(--amber); }
+
+/* ---------- layouts ----------
+   Balanced is the base cockpit. The other two re-weight instruments vs paper, keyed on the root
+   data-layout attribute. Pure CSS. The paper never changes shape (it is a print artifact); in
+   Instruments focus the full paper is hidden on screen and a compact summary shows instead, but
+   the paper stays in the DOM so print is unaffected. */
+
+/* Invoice focus: slim the instruments, widen the paper. */
+:root[data-layout="invoice"] .cockpit-top .mod { display: none; }            /* hide the day trace */
+:root[data-layout="invoice"] .cockpit-top .gauges { grid-template-columns: repeat(4, 1fr); }
+:root[data-layout="invoice"] .cockpit-top .g { padding: 8px 12px; }
+:root[data-layout="invoice"] .cockpit-top .g .v { font-size: 20px; margin-top: 4px; }
+:root[data-layout="invoice"] .cockpit-top .g .u { display: none; }
+:root[data-layout="invoice"] .cockpit-console .dial-card,
+:root[data-layout="invoice"] .cockpit-console .earn,
+:root[data-layout="invoice"] .cockpit-console .earn-h { display: none; }
+:root[data-layout="invoice"] .cockpit-split { grid-template-columns: 300px 1fr; }
+
+/* Instruments focus: enlarge the trace and dial, hide the full paper, show the summary card. */
+:root[data-layout="instruments"] .cockpit-top .mod-b { padding-bottom: 22px; }
+:root[data-layout="instruments"] .cockpit-split { grid-template-columns: 380px 1fr; }
+@media screen {
+  :root[data-layout="instruments"] .paperstage .paper { display: none; }
+}
+:root[data-layout="instruments"] .invoice-summary { display: flex; }
+/* the summary card is display:none by default (Task 7), shown only here */
+
+/* Compact invoice summary: hidden by default, shown only under Instruments focus (Task 6). */
+.invoice-summary {
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+  align-self: start;
+  margin: 0 auto;
+  padding: 22px 26px;
+  background: var(--panel);
+  border: 1px solid var(--line-2);
+  border-radius: 12px;
+  min-width: 260px;
+}
+.isum-amt { font-size: 30px; color: var(--hot); line-height: 1; }
+.isum-sub { font-size: 12px; color: var(--dim); }
 
 @media (prefers-reduced-motion: reduce) {
   * {
