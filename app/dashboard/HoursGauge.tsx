@@ -1,28 +1,27 @@
 "use client";
 
-// The hours gauge, docs/10-visual-direction.md "Motion and character". A circular dial
-// showing hours-this-month as a needle sweeping toward a monthly target, built with
-// conic-gradient for the fill arc and transform: rotate() for the needle, both driven
-// by one CSS custom property, --fill-percent, rather than JavaScript animating per
-// frame. See app/globals.css for the @property registration that makes --fill-percent
-// interpolate smoothly under `transition` instead of jumping.
+// The hours dial, docs/10 "Motion and character". A circular dial with a needle sweeping toward
+// a target, built with conic-gradient and transform: rotate() driven by one CSS custom property.
+// Generalized so the cockpit can point it at any metric: the caller resolves the center value,
+// the arc fill percent, the unit, the foot text, and the aria label.
 
 import { useEffect, useState } from "react";
+import { money } from "@/lib/invoice";
 
 export function HoursGauge({
-  hours,
-  target,
+  value,
+  unit,
+  fillPercent,
+  foot,
+  ariaLabel,
 }: {
-  hours: number;
-  target: number;
+  value: number;
+  unit: "h" | "$";
+  fillPercent: number;
+  foot: string;
+  ariaLabel: string;
 }) {
-  const percent = Math.min(100, target > 0 ? (hours / target) * 100 : 0);
-
-  // Rest state is 0, per docs/10: "a month with no hours logged yet still renders the
-  // dial at rest... rather than an empty state or a hidden component." On mount, ease
-  // from rest to the real value so the needle actually sweeps once, the same motion the
-  // dial keeps for every later change. One rAF to sequence past the first paint, not a
-  // per-frame loop: this fires once and stops.
+  const percent = Math.min(100, Math.max(0, fillPercent));
   const [shown, setShown] = useState(0);
 
   useEffect(() => {
@@ -40,15 +39,21 @@ export function HoursGauge({
       className="gauge"
       style={{ ["--fill-percent" as string]: shown }}
       role="img"
-      aria-label={`${hours.toFixed(1)} of ${target} hours logged this month`}
+      aria-label={ariaLabel}
     >
       <div className="gauge-needle" />
       <div className="gauge-face">
         <div className="gauge-value">
-          {hours.toFixed(1)}
-          <span className="gauge-unit">h</span>
+          {unit === "$" ? (
+            money(value)
+          ) : (
+            <>
+              {value.toFixed(1)}
+              <span className="gauge-unit">h</span>
+            </>
+          )}
         </div>
-        <div className="gauge-target">of {target}h target</div>
+        <div className="gauge-target">{foot}</div>
       </div>
     </div>
   );

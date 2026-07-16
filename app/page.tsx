@@ -26,11 +26,12 @@ import {
   unbilledStart,
   type Mode,
 } from "@/lib/selection";
-import { weeklyEarnings, monthReadout } from "@/lib/hours";
+import { weeklyEarnings, dayReadout, weekReadout, monthReadout, unbilled } from "@/lib/hours";
 import { useAfpData } from "./useAfpData";
 import { useCountUp } from "./useCountUp";
+import { useSettings } from "./useSettings";
 import { SyncStatus } from "./SyncStatus";
-import InstrumentCluster, { MONTHLY_TARGET_HOURS } from "./cockpit/InstrumentCluster";
+import InstrumentCluster from "./cockpit/InstrumentCluster";
 import { HoursGauge } from "./dashboard/HoursGauge";
 import EarningsByWeek from "./cockpit/EarningsByWeek";
 import SessionManifest from "./cockpit/SessionManifest";
@@ -43,6 +44,7 @@ export default function Page() {
   // interval, plus a manual refresh, all hitting the same 60s-cached route. It replaces the
   // one-shot boot fetch this component used to own. See app/useAfpData.ts.
   const { data, error: err, lastSynced, refreshing, refresh } = useAfpData();
+  const { settings, setTheme, setLayout, setDialMetric } = useSettings();
 
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -200,7 +202,25 @@ export default function Page() {
     [data, today2]
   );
 
-  const monthHours = data && today2 ? monthReadout(data.hours, today2).hours : 0;
+  const dial = useMemo(() => {
+    const rest = { value: 0, unit: "h" as const, fillPercent: 0, foot: "of 60 h target", label: "Hours this month", ariaLabel: "dial at rest" };
+    if (!data || !today2) return rest;
+    const m = settings.dialMetric;
+    if (m === "today") {
+      const h = dayReadout(data.hours, today2).hours;
+      return { value: h, unit: "h" as const, fillPercent: (h / 8) * 100, foot: "of 8 h day", label: "Hours today", ariaLabel: `${h.toFixed(1)} of 8 hours today` };
+    }
+    if (m === "week") {
+      const h = weekReadout(data.hours, today2).hours;
+      return { value: h, unit: "h" as const, fillPercent: (h / 40) * 100, foot: "of 40 h week", label: "Hours this week", ariaLabel: `${h.toFixed(1)} of 40 hours this week` };
+    }
+    if (m === "unbilled") {
+      const u = unbilled(data, today2);
+      return { value: u.amount, unit: "$" as const, fillPercent: (u.hours / 60) * 100, foot: `${u.sessions} session${u.sessions === 1 ? "" : "s"} owed`, label: "Unbilled", ariaLabel: `${money(u.amount)} unbilled` };
+    }
+    const h = monthReadout(data.hours, today2).hours;
+    return { value: h, unit: "h" as const, fillPercent: (h / 60) * 100, foot: "of 60 h target", label: "Hours this month", ariaLabel: `${h.toFixed(1)} of 60 hours this month` };
+  }, [settings.dialMetric, data, today2]);
 
   const runnerHours = selected.reduce((s, r) => s + roundHours(r.hours, round), 0);
   const runnerAmt = selected.reduce((s, r) => s + roundHours(r.hours, round) * r.rate, 0);
@@ -263,11 +283,14 @@ export default function Page() {
       <div className="cockpit-split">
         <aside className="cockpit-console">
           <div className="dial-card">
-            <h2 className="eyebrow">Hours this month</h2>
-            <HoursGauge hours={monthHours} target={MONTHLY_TARGET_HOURS} />
-            <div className="dial-foot mono">
-              {monthHours.toFixed(1)} / {MONTHLY_TARGET_HOURS} h target
-            </div>
+            <h2 className="eyebrow">{dial.label}</h2>
+            <HoursGauge
+              value={dial.value}
+              unit={dial.unit}
+              fillPercent={dial.fillPercent}
+              foot={dial.foot}
+              ariaLabel={dial.ariaLabel}
+            />
           </div>
 
           <h2>Sessions in range</h2>
