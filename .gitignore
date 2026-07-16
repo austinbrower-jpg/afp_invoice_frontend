@@ -26,3 +26,6 @@ __MACOSX/
 # editor
 .idea/
 *.swp
+
+# Visual brainstorming companion scratch
+.superpowers/
