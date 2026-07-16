@@ -8,7 +8,7 @@
 // especially the @media print block, is written against these exact classes. Renaming
 // anything here is a change to the deliverable.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Payload, Session } from "@/lib/notion";
 import {
   addDays,
@@ -191,10 +191,30 @@ export default function Page() {
   const runnerHours = selected.reduce((s, r) => s + roundHours(r.hours, round), 0);
   const runnerAmt = selected.reduce((s, r) => s + roundHours(r.hours, round) * r.rate, 0);
 
+  // The number you are about to charge someone is the point of the tool. Let it move.
+  // Console only: the paper stays inert, because it is a document, not an instrument.
+  const shownHours = useCountUp(runnerHours);
+  const shownAmt = useCountUp(runnerAmt);
+
   const days = [...new Set([...visible].sort(byDayDesc).map((r) => r.date))];
 
+  const [wiping, setWiping] = useState(false);
+  const savePdf = () => {
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (reduce) {
+      window.print();
+      return;
+    }
+    setWiping(true);
+    window.setTimeout(() => {
+      window.print();
+      setWiping(false);
+    }, 270);
+  };
+
   return (
-    <>
+    <div className="station">
+      {wiping && <div className="printwipe run" aria-hidden="true" />}
       <div className="topbar">
         <div className="brand">
           <b>Invoice Builder</b>
@@ -230,7 +250,7 @@ export default function Page() {
             </button>
           </div>
         </div>
-        <button className="print-btn" onClick={() => window.print()}>
+        <button className="print-btn" onClick={savePdf}>
           Save PDF
         </button>
       </div>
@@ -273,12 +293,13 @@ export default function Page() {
                           <span>
                             <span className="sid">{r.sid}</span>
                             <span className="meta">
-                              {r.start} – {r.end}
-                              {r.location ? " · " + r.location : ""}
-                              <br />
-                              {statusTag(r.status)}
-                              {!r.billable && <span className="tag nobill">non-billable</span>}
-                              <span className="tag">{r.status}</span>
+                              <span style={{ flexBasis: "100%" }}>
+                                {r.start} – {r.end}
+                                {r.location ? " · " + r.location : ""}
+                              </span>
+                              <StatusLed status={r.status} />
+                              <span className="statuslabel">{r.status}</span>
+                              {!r.billable && <span className="nobill">· non-billable</span>}
                             </span>
                           </span>
                           <span className="amt">
@@ -303,11 +324,11 @@ export default function Page() {
             </div>
             <div className="row">
               <span>Hours</span>
-              <b className="mono">{runnerHours.toFixed(2)}</b>
+              <b className="mono">{shownHours.toFixed(2)}</b>
             </div>
             <div className="row total">
               <span>Amount</span>
-              <b className="mono">{money(runnerAmt)}</b>
+              <b className="mono">{money(shownAmt)}</b>
             </div>
           </div>
 
@@ -547,7 +568,7 @@ export default function Page() {
           </div>
         </main>
       </div>
-    </>
+    </div>
   );
 }
 
@@ -573,11 +594,81 @@ function autoSelect(hours: Session[], from: string, to: string, showall: boolean
   return next;
 }
 
-function statusTag(status: string) {
-  if (status === "Invoiced") return <span className="tag invoiced">invoiced</span>;
-  if (status === "Ready to Invoice") return <span className="tag ready">ready</span>;
-  if (status === "Superseded") return <span className="tag nobill">superseded</span>;
-  return null;
+// Billing Status as a signal light rather than a text pill, per docs/10. Ring versus
+// fill carries the meaning, not colour alone. The status name stays as a plain label
+// next to it: the LED is the signal, the word is what makes it readable and what a
+// screen reader gets. Unknown statuses fall back to the Draft ring rather than
+// disappearing, because a status we do not recognise is still a status.
+const LED_CLASS: Record<string, string> = {
+  Draft: "led-draft",
+  Reviewed: "led-reviewed",
+  "Ready to Invoice": "led-ready",
+  Invoiced: "led-invoiced",
+  Paid: "led-paid",
+  Superseded: "led-superseded",
+};
+
+function StatusLed({ status }: { status: string }) {
+  const cls = LED_CLASS[status] ?? "led-draft";
+  return <span className={`led ${cls}`} role="img" aria-label={`Status: ${status}`} />;
+}
+
+// Bounded count-up: steps the displayed value for a fixed ~240ms after a change and
+// stops. Not a persistent render loop, which is what docs/10's Performance section
+// actually prohibits. Drops out under reduced motion, where the value simply snaps.
+//
+// The number this animates is the amount you are about to charge someone, so the
+// animation is never allowed to be the reason it is wrong. requestAnimationFrame does
+// not fire in a hidden or backgrounded tab, which would strand the display on its
+// starting value: the total read $0.00 while the real figure was $647.70. So the target
+// is guaranteed three ways: snap immediately if the page is hidden or motion is
+// reduced, a guard timer that lands the value even if no frame ever runs, and a final
+// settle on teardown. Motion is the garnish; the figure is the point.
+function useCountUp(target: number, ms = 240): number {
+  const [shown, setShown] = useState(target);
+  const fromRef = useRef(target);
+
+  useEffect(() => {
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    const from = fromRef.current;
+
+    if (reduce || document.hidden || from === target) {
+      fromRef.current = target;
+      setShown(target);
+      return;
+    }
+
+    let raf: number | null = null;
+    let settled = false;
+    const settle = () => {
+      if (settled) return;
+      settled = true;
+      fromRef.current = target;
+      setShown(target);
+    };
+
+    const start = performance.now();
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - start) / ms);
+      const e = 1 - Math.pow(1 - t, 3); // ease-out: moves, then settles
+      if (t < 1) {
+        setShown(from + (target - from) * e);
+        raf = requestAnimationFrame(tick);
+      } else settle();
+    };
+    raf = requestAnimationFrame(tick);
+
+    // Backstop. If no frame ever runs, this still lands the true value.
+    const guard = window.setTimeout(settle, ms + 120);
+
+    return () => {
+      if (raf !== null) cancelAnimationFrame(raf);
+      window.clearTimeout(guard);
+      settle();
+    };
+  }, [target, ms]);
+
+  return shown;
 }
 
 // The panel names specific problems in the current selection, not generic warnings.

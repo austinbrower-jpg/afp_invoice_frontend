@@ -6,35 +6,75 @@
    The console half of this file (topbar, rail, ledger) is the prototype's own look, not
    Station. Station is a later phase and lands scoped to its own wrapper. */
 
-:root {
-  --graphite: #15171c;
-  --panel: #1d2027;
-  --panel-2: #242832;
-  --line: #31363f;
-  --text: #e6e8ec;
-  --dim: #8b929e;
-  --accent: #6366f1; /* AFP's Color from Notion, the client's accent. Not a BBB color. */
-  --amber: #d9a441;
+/* ---------- Station: the console theme, docs/10-visual-direction.md ----------
+   Scoped to .station, not :root. This is the theme seam: a second theme is a token
+   block and a class swap, and scoping is what keeps that true. It is also what keeps
+   the console's tokens from reaching the paper, which is a different design system on
+   purpose and must not inherit these. No hardcoded hex belongs in a component. */
+.station {
+  --bg: #0a0c10; /* field */
+  --panel: #11151b; /* module surface */
+  --line: #1f2731; /* hairline */
+  --line-2: #2a3440; /* emphasis rule */
+  --tx: #cbd4de; /* primary text */
+  --dim: #66727f; /* secondary */
+  --dim-2: #454f5b; /* labels, ticks, non-billable */
+  --amber: #f0a93b; /* signal: live hours, worked time */
+  --hot: #ff6250; /* money owed, recording, now */
+  --ok: #4fb286; /* invoiced, settled */
+
+  --ui: "Saira", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --data: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+
+/* ---------- the paper: a separate system, do not unify with the above ----------
+   Tokens live on .paper so Station cannot bleed in through inheritance. The type is
+   the prototype's, deliberately not Saira. The paper is a print artifact verified in
+   Phase 3; restyling it alongside the console would invalidate that. */
+.paper {
   --paper: #ffffff;
   --ink: #14161a;
   --ink-dim: #5d636d;
   --rule: #d7dae0;
+  --accent: #6366f1; /* AFP's Color from Notion, the client's accent. Not a BBB color. */
 }
+
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 body {
-  background: var(--graphite);
-  color: var(--text);
-  font-family: "Instrument Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-size: 14px;
+  background: #0a0c10;
   -webkit-font-smoothing: antialiased;
 }
+.station {
+  background: var(--bg);
+  color: var(--tx);
+  font-family: var(--ui);
+  font-size: 14px;
+}
+/* Tabular numerals everywhere a figure can change, so digits do not jitter as they
+   count. See docs/10 type notes and the count-up item under Motion and character. */
 .mono {
-  font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  font-family: var(--data);
   font-variant-numeric: tabular-nums;
+}
+
+/* ---------- eyebrow label ----------
+   The instrument-labeling treatment: mono, uppercase, wide tracking. docs/10 asks for
+   this on every section header rather than a few places, so it is one class the console
+   applies everywhere instead of being redeclared per rule. */
+.eyebrow,
+.rail h2,
+.rangebox label,
+.field label,
+.brand span,
+.runner .row span {
+  font-family: var(--data);
+  text-transform: uppercase;
+  color: var(--dim);
+  font-weight: 500;
 }
 
 /* ---------- top bar ---------- */
@@ -47,7 +87,7 @@ body {
   gap: 20px;
   flex-wrap: wrap;
   padding: 14px 22px;
-  background: rgba(21, 23, 28, 0.92);
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--line);
 }
@@ -62,11 +102,8 @@ body {
   letter-spacing: -0.01em;
 }
 .brand span {
-  font-family: "IBM Plex Mono", monospace;
   font-size: 10px;
-  color: var(--dim);
   letter-spacing: 0.14em;
-  text-transform: uppercase;
 }
 .rangebox {
   display: flex;
@@ -75,32 +112,31 @@ body {
   margin-left: auto;
 }
 .rangebox label {
-  font-family: "IBM Plex Mono", monospace;
   font-size: 10px;
-  color: var(--dim);
   letter-spacing: 0.1em;
-  text-transform: uppercase;
 }
-input[type="date"],
-input[type="text"],
-select {
-  background: var(--panel-2);
+.station input[type="date"],
+.station input[type="text"],
+.station select {
+  background: var(--panel);
   border: 1px solid var(--line);
-  color: var(--text);
+  color: var(--tx);
   border-radius: 6px;
   padding: 6px 8px;
   font-size: 13px;
-  font-family: inherit;
+  font-family: var(--ui);
 }
-input[type="date"] {
-  font-family: "IBM Plex Mono", monospace;
+.station input[type="date"] {
+  font-family: var(--data);
+  font-variant-numeric: tabular-nums;
   font-size: 12px;
   color-scheme: dark;
 }
-input:focus,
-select:focus,
-button:focus-visible {
-  outline: 2px solid var(--accent);
+/* Visible keyboard focus is a Quality floor requirement, not decoration. */
+.station input:focus,
+.station select:focus,
+.station button:focus-visible {
+  outline: 2px solid var(--amber);
   outline-offset: 1px;
 }
 .chips {
@@ -111,27 +147,31 @@ button:focus-visible {
   background: transparent;
   border: 1px solid var(--line);
   color: var(--dim);
-  font-family: "IBM Plex Mono", monospace;
+  font-family: var(--data);
   font-size: 11px;
   letter-spacing: 0.04em;
   padding: 6px 10px;
   border-radius: 999px;
   cursor: pointer;
+  transition: border-color 120ms ease, color 120ms ease;
 }
 .chip:hover {
-  border-color: var(--accent);
-  color: var(--text);
+  border-color: var(--amber);
+  color: var(--tx);
 }
+/* Amber, not --hot. docs/10 reserves --hot for money owed, the recording state, and the
+   now hairline, and says not to spend it on anything else. A button is not that. */
 .print-btn {
-  background: var(--accent);
+  background: var(--amber);
   border: 0;
-  color: #fff;
-  font-family: inherit;
+  color: var(--bg);
+  font-family: var(--ui);
   font-weight: 600;
   font-size: 13px;
   padding: 9px 18px;
   border-radius: 6px;
   cursor: pointer;
+  transition: filter 120ms ease;
 }
 .print-btn:hover {
   filter: brightness(1.12);
@@ -157,12 +197,8 @@ button:focus-visible {
   padding: 18px 16px 60px;
 }
 .rail h2 {
-  font-family: "IBM Plex Mono", monospace;
   font-size: 10px;
-  font-weight: 500;
-  color: var(--dim);
   letter-spacing: 0.16em;
-  text-transform: uppercase;
   margin-bottom: 12px;
 }
 .rail h2 + h2 {
@@ -182,48 +218,70 @@ button:focus-visible {
   margin-bottom: 6px;
 }
 .day-head .d {
-  font-family: "IBM Plex Mono", monospace;
+  font-family: var(--data);
+  font-variant-numeric: tabular-nums;
   font-size: 12px;
-  color: var(--text);
+  color: var(--tx);
   letter-spacing: 0.02em;
 }
 .day-head .h {
-  font-family: "IBM Plex Mono", monospace;
+  font-family: var(--data);
+  font-variant-numeric: tabular-nums;
   font-size: 11px;
   color: var(--dim);
 }
 
+/* Selection as a channel strip, not a form field. The amber left-edge bar is the
+   signal; the checkbox stays a real, focusable checkbox underneath it. docs/10,
+   Motion and character. */
 .sess {
+  position: relative;
   display: grid;
   grid-template-columns: 20px 1fr auto;
   gap: 10px;
   align-items: start;
-  padding: 9px 8px;
+  padding: 9px 8px 9px 12px;
   border-radius: 7px;
   cursor: pointer;
   border: 1px solid transparent;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+.sess::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  border-radius: 1px;
+  background: transparent;
+  transition: background-color 120ms ease, box-shadow 120ms ease;
 }
 .sess:hover {
   background: var(--panel);
 }
 .sess.on {
   background: var(--panel);
-  border-color: #3d4250;
+  border-color: var(--line-2);
+}
+.sess.on::before {
+  background: var(--amber);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--amber) 55%, transparent);
 }
 .sess.locked {
   opacity: 0.42;
 }
 .sess input {
   margin-top: 2px;
-  accent-color: var(--accent);
+  accent-color: var(--amber);
   width: 14px;
   height: 14px;
   cursor: pointer;
 }
 .sess .sid {
-  font-family: "IBM Plex Mono", monospace;
+  font-family: var(--data);
   font-size: 11px;
-  color: var(--text);
+  color: var(--tx);
   word-break: break-all;
 }
 .sess .meta {
@@ -231,52 +289,90 @@ button:focus-visible {
   color: var(--dim);
   margin-top: 3px;
   line-height: 1.45;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 .sess .amt {
   text-align: right;
-  font-family: "IBM Plex Mono", monospace;
+  font-family: var(--data);
+  font-variant-numeric: tabular-nums;
   font-size: 11px;
   line-height: 1.5;
 }
 .sess .amt b {
   display: block;
   font-weight: 500;
-  color: var(--text);
+  color: var(--tx);
 }
 .sess .amt span {
   color: var(--dim);
 }
-.tag {
+
+/* ---------- status signal lights ----------
+   Billing Status as an indicator rather than a text pill. Ring versus fill carries the
+   meaning, so Draft and Invoiced stay distinguishable without relying on amber and
+   green reading correctly on every display or to every eye. docs/10. */
+.led {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  position: relative;
   display: inline-block;
-  font-family: "IBM Plex Mono", monospace;
+}
+.led-draft {
+  border: 1.5px solid var(--dim-2);
+}
+.led-reviewed {
+  background: var(--dim-2);
+}
+.led-ready {
+  background: var(--amber);
+}
+.led-invoiced {
+  border: 1.5px solid var(--ok);
+}
+.led-paid {
+  background: var(--ok);
+}
+.led-superseded {
+  background: var(--dim-2);
+}
+/* The diagonal strike separates "dead, never happened" from "not started yet", which a
+   same-colour dot alone cannot. */
+.led-superseded::after {
+  content: "";
+  position: absolute;
+  left: -3px;
+  right: -3px;
+  top: 50%;
+  height: 1.5px;
+  background: var(--dim);
+  transform: translateY(-50%) rotate(-45deg);
+}
+.statuslabel {
+  font-family: var(--data);
   font-size: 9px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  padding: 1px 5px;
-  border-radius: 3px;
-  border: 1px solid var(--line);
-  color: var(--dim);
-  margin-right: 4px;
+  color: var(--dim-2);
 }
-.tag.invoiced {
-  border-color: #3a5f4a;
-  color: #7dc79a;
-}
-.tag.ready {
-  border-color: #4a4f7a;
-  color: #9ea6f5;
-}
-.tag.nobill {
-  border-color: #6b4a4a;
-  color: #e08b8b;
+.nobill {
+  font-family: var(--data);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dim-2);
 }
 
 .runner {
   position: sticky;
   bottom: 0;
   margin-top: 14px;
-  background: var(--panel-2);
-  border: 1px solid var(--line);
+  background: var(--panel);
+  border: 1px solid var(--line-2);
   border-radius: 8px;
   padding: 12px 14px;
 }
@@ -284,7 +380,8 @@ button:focus-visible {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  font-family: "IBM Plex Mono", monospace;
+  font-family: var(--data);
+  font-variant-numeric: tabular-nums;
   font-size: 12px;
 }
 .runner .row + .row {
@@ -293,17 +390,18 @@ button:focus-visible {
   border-top: 1px solid var(--line);
 }
 .runner .row span {
-  color: var(--dim);
   font-size: 10px;
   letter-spacing: 0.1em;
-  text-transform: uppercase;
 }
 .runner .row b {
   font-weight: 500;
+  color: var(--tx);
 }
+/* --hot is money you have not collected. This is the one place on the console that
+   earns it, and docs/10 says not to spend it anywhere else. */
 .runner .row.total b {
   font-size: 18px;
-  color: var(--accent);
+  color: var(--hot);
 }
 
 /* ---------- options ---------- */
@@ -322,11 +420,8 @@ button:focus-visible {
   margin-bottom: 10px;
 }
 .field label {
-  font-family: "IBM Plex Mono", monospace;
   font-size: 9px;
-  color: var(--dim);
   letter-spacing: 0.1em;
-  text-transform: uppercase;
 }
 .toggle {
   display: flex;
@@ -338,43 +433,70 @@ button:focus-visible {
   padding: 5px 0;
 }
 .toggle input {
-  accent-color: var(--accent);
+  accent-color: var(--amber);
   width: 14px;
   height: 14px;
 }
 
 .flags {
-  border: 1px solid #4a3f2a;
-  background: #241f16;
+  border: 1px solid var(--line-2);
+  background: var(--panel);
+  border-left: 2px solid var(--amber);
   border-radius: 8px;
   padding: 11px 13px;
 }
 .flags p {
   font-size: 11.5px;
   line-height: 1.55;
-  color: #d9c9a8;
+  color: var(--dim);
   display: flex;
   gap: 7px;
+}
+.flags p b {
+  color: var(--tx);
+  font-weight: 500;
 }
 .flags p + p {
   margin-top: 7px;
 }
 .flags p::before {
   content: "!";
-  font-family: "IBM Plex Mono", monospace;
+  font-family: var(--data);
   color: var(--amber);
   font-weight: 600;
   flex-shrink: 0;
 }
 .flags.clean {
-  border-color: #2a3f30;
-  background: #16241b;
-}
-.flags.clean p {
-  color: #8fbf9f;
+  border-left-color: var(--ok);
 }
 .flags.clean p::before {
   content: "";
+}
+
+/* ---------- print wipe ----------
+   The console and the paper are two opposite worlds, and until now that idea only
+   existed in the CSS and was never felt. Save PDF wipes from one to the other before
+   the print dialog opens. Bounded, one shot, no render loop. docs/10.
+   Skipped entirely under reduced motion, where the dialog just opens. */
+.printwipe {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: var(--paper, #fff);
+  transform: scaleY(0);
+  transform-origin: top;
+  pointer-events: none;
+}
+.printwipe.run {
+  animation: printwipe 260ms ease-in forwards;
+}
+@keyframes printwipe {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
 }
 
 /* ---------- paper ---------- */
@@ -392,6 +514,10 @@ button:focus-visible {
   color: var(--ink);
   padding: 0.62in 0.68in;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 22px 60px rgba(0, 0, 0, 0.5);
+  /* Declared, not inherited. The paper sits inside .station, so without this it picks
+     up Saira from the console and the printed invoice silently restyles itself. The
+     paper's type is part of a verified print output and is not Station's. */
+  font-family: "Instrument Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 9.6pt;
   line-height: 1.5;
   flex-shrink: 0;
@@ -628,13 +754,16 @@ table.items .desc small {
   font-size: 11pt;
   margin-bottom: 8px;
 }
+/* Uses --accent, a paper token, not Station's --amber. The paper sits inside .station
+   and custom properties inherit, so reaching for --amber here would quietly pull a
+   console token onto the paper. Two systems, no bleed. */
 .loadstate .hint {
   margin-top: 10px;
   font-family: "IBM Plex Mono", monospace;
   font-size: 8pt;
   text-align: left;
   background: #f3f4f7;
-  border-left: 2px solid var(--amber);
+  border-left: 2px solid var(--accent);
   padding: 10px 12px;
 }
 
@@ -647,8 +776,12 @@ table.items .desc small {
   body {
     background: #fff;
   }
+  .station {
+    background: #fff;
+  }
   .topbar,
-  .rail {
+  .rail,
+  .printwipe {
     display: none !important;
   }
   .stage {

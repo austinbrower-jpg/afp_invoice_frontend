@@ -14,13 +14,15 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        {/* The prototype's fonts, kept as-is. The stylesheet names these families
-            directly in dozens of rules, including the print block, so swapping in
-            next/font would mean rewriting the CSS that is the deliverable. */}
+        {/* Two type systems on purpose, matching the two design systems.
+            Saira + JetBrains Mono are Station's, for the console (docs/10).
+            Instrument Sans + IBM Plex Mono are the paper's, unchanged from the
+            prototype. The paper's type is part of a print output already verified in
+            Phase 3, so it does not get restyled along with the console. */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link
-          href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Instrument+Sans:wght@400;500;600;700&display=swap"
+          href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Saira:wght@400;500;600;700&display=swap"
           rel="stylesheet"
         />
       </head>
