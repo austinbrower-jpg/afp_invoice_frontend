@@ -676,6 +676,18 @@ table.items .desc small {
   .detail > h3 {
     break-after: avoid;
   }
+  /* Found by Phase 3, printing an 11-session selection to a real PDF. The totals block
+     split across pages: "Billable hours" ended page 1 and "TOTAL DUE" opened page 2,
+     stranding the grand total away from the table it belongs to. The prototype never
+     showed this because its fixture was short enough to fit on one page. */
+  .totals {
+    break-inside: avoid;
+  }
+  /* Same class of defect, one row down: a line item is two lines, and nothing stopped
+     one from tearing in half across a break. Not observed, cheap to prevent. */
+  table.items tr {
+    break-inside: avoid;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   * {
