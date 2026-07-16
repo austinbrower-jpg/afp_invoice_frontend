@@ -3,43 +3,55 @@
 // exception; it fails 401 rather than redirecting, since a fetch() call has nowhere
 // to redirect to.
 //
-// The polyfill below is not decoration. Production returned a 500 on every route,
-// including /login, with "ReferenceError: __dirname is not defined". Documented,
-// longstanding Next.js issue: next/server bundles a user-agent parser (ua-parser-js)
-// that references __dirname, a real Node.js global next/server assumes exists. Local
-// dev's Node-based simulation of the Edge runtime tolerates it; Vercel's real Edge
-// isolate does not. This runs once at cold start, before any request is handled, so
-// the polyfill is in place before that lazy code path can ever hit it.
-if (typeof globalThis.__dirname === "undefined") {
-  (globalThis as unknown as { __dirname: string }).__dirname = "/";
-}
+// No import from "next/server", at all, on purpose. Production crashed on every
+// route, including /login, with "ReferenceError: __dirname is not defined". Traced it
+// to the actual stack trace on the upstream issue (vercel/next.js#53968): importing
+// anything from next/server pulls in next's own user-agent helper, which pulls in a
+// bundled ua-parser-js that references __dirname at that module's own top level, as a
+// side effect of the import itself, before any code in this file ever runs. No
+// polyfill placed in this file can fix that, since dependency modules evaluate before
+// the importing module's own top-level statements do. Still open, still reproducing,
+// since at least Next 13.4.2.
+//
+// Next's own middleware contract already permits a plain Response or undefined as the
+// return value, not only NextResponse (see NextMiddlewareResult), so nothing here
+// actually needs next/server. Cookies and the URL come off the standard Request
+// object directly. lib/auth.ts itself never touches next/server either, only
+// crypto.subtle, so importing it is unaffected by any of this.
 
-import { NextRequest, NextResponse } from "next/server";
-// Relative import, not the "@/" alias. Vercel's edge-function bundler for middleware
-// does not always resolve tsconfig path aliases, even though Next's own build does; a
-// relative path sidesteps that deployment-only failure mode. Only matters here because
-// middleware runs on the Edge runtime, which gets a separate bundling pass.
 import { COOKIE_NAME, verify } from "./lib/auth";
 
 const OPEN_PATHS = ["/login", "/api/login"];
 
-export async function middleware(req: NextRequest) {
-  if (OPEN_PATHS.some((p) => req.nextUrl.pathname.startsWith(p))) {
-    return NextResponse.next();
+function getCookie(req: Request, name: string): string | undefined {
+  const header = req.headers.get("cookie");
+  if (!header) return undefined;
+  for (const part of header.split(";")) {
+    const eq = part.indexOf("=");
+    if (eq === -1) continue;
+    if (part.slice(0, eq).trim() === name) return part.slice(eq + 1).trim();
+  }
+  return undefined;
+}
+
+export async function middleware(req: Request) {
+  const url = new URL(req.url);
+
+  if (OPEN_PATHS.some((p) => url.pathname.startsWith(p))) {
+    return;
   }
 
   const secret = process.env.APP_SECRET;
-  const token = req.cookies.get(COOKIE_NAME)?.value;
+  const token = getCookie(req, COOKIE_NAME);
   if (secret && (await verify(token, secret))) {
-    return NextResponse.next();
+    return;
   }
 
-  if (req.nextUrl.pathname.startsWith("/api/")) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (url.pathname.startsWith("/api/")) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const url = req.nextUrl.clone();
   url.pathname = "/login";
-  return NextResponse.redirect(url);
+  return Response.redirect(url.toString(), 307);
 }
 
 export const config = {
