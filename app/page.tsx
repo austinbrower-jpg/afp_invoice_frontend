@@ -26,16 +26,17 @@ import {
   unbilledStart,
   type Mode,
 } from "@/lib/selection";
-import { weeklyEarnings } from "@/lib/hours";
+import { weeklyEarnings, monthReadout } from "@/lib/hours";
 import { useAfpData } from "./useAfpData";
 import { useCountUp } from "./useCountUp";
 import { SyncStatus } from "./SyncStatus";
-import InstrumentCluster from "./cockpit/InstrumentCluster";
+import InstrumentCluster, { MONTHLY_TARGET_HOURS } from "./cockpit/InstrumentCluster";
+import { HoursGauge } from "./dashboard/HoursGauge";
 import EarningsByWeek from "./cockpit/EarningsByWeek";
 import SessionManifest from "./cockpit/SessionManifest";
 import InvoiceControls from "./cockpit/InvoiceControls";
 import DataFlags from "./cockpit/DataFlags";
-import InvoicePaper, { type Line, type Entry } from "./cockpit/InvoicePaper";
+import InvoicePaper, { type Entry } from "./cockpit/InvoicePaper";
 
 export default function Page() {
   // Notion stays synced through this hook: a background refetch on window focus and on a slow
@@ -199,6 +200,8 @@ export default function Page() {
     [data, today2]
   );
 
+  const monthHours = data && today2 ? monthReadout(data.hours, today2).hours : 0;
+
   const runnerHours = selected.reduce((s, r) => s + roundHours(r.hours, round), 0);
   const runnerAmt = selected.reduce((s, r) => s + roundHours(r.hours, round) * r.rate, 0);
 
@@ -253,6 +256,14 @@ export default function Page() {
 
       <div className="cockpit-split">
         <aside className="cockpit-console">
+          <div className="dial-card">
+            <h2 className="eyebrow">Hours this month</h2>
+            <HoursGauge hours={monthHours} target={MONTHLY_TARGET_HOURS} />
+            <div className="dial-foot mono">
+              {monthHours.toFixed(1)} / {MONTHLY_TARGET_HOURS} h target
+            </div>
+          </div>
+
           <h2>Sessions in range</h2>
           <SessionManifest days={days} visible={visible} picked={picked} onToggle={toggle} />
 

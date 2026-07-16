@@ -1545,7 +1545,9 @@ table.items .desc small {
 }
 .cockpit-console h2 + h2,
 .cockpit-console .earn + h2,
-.cockpit-console .runner + h2 {
+.cockpit-console .runner + h2,
+.cockpit-console .toggle + h2,
+.cockpit-console .dial-card + h2 {
   margin-top: 26px;
 }
 @media (max-width: 1100px) {

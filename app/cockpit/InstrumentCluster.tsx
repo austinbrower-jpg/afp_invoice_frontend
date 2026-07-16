@@ -7,7 +7,6 @@
 
 import type { Payload } from "@/lib/notion";
 import { useCountUp } from "../useCountUp";
-import { HoursGauge } from "../dashboard/HoursGauge";
 import { DayTrace } from "../dashboard/DayTrace";
 import {
   buildDayTraces,

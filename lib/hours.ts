@@ -260,7 +260,7 @@ export function weeklyEarnings(payload: Payload, today: string, weeks = 6): Week
 
   for (const s of payload.hours) {
     if (!isLive(s)) continue; // drops superseded and non-billable
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(s.date)) continue;
+    if (!ISO_DATE.test(s.date)) continue;
     const w = ensure(startOfWeekISO(s.date));
     const dollars = s.hours * s.rate;
     w.hours += s.hours;
