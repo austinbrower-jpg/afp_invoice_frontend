@@ -10,14 +10,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import type { Payload, Session } from "@/lib/notion";
 import {
   addDays,
   fmtDate,
   money,
   nextInvoiceNumber,
   roundHours,
-  shortDate,
   todayISO,
 } from "@/lib/invoice";
 import {
@@ -26,18 +24,16 @@ import {
   byDayDesc,
   eligible,
   inRange,
-  isTerminal,
   unbilledStart,
   type Mode,
 } from "@/lib/selection";
 import { useAfpData } from "./useAfpData";
 import { useCountUp } from "./useCountUp";
 import { SyncStatus } from "./SyncStatus";
-import { StatusLed } from "./StatusLed";
-
-// `key` is the ISO date, carried only so entries can sort chronologically. See the
-// sort in `entries` below for why the displayed stamp cannot be sorted on.
-type Entry = { h: string; stamp: string; body: string; key: string };
+import SessionManifest from "./cockpit/SessionManifest";
+import InvoiceControls from "./cockpit/InvoiceControls";
+import DataFlags from "./cockpit/DataFlags";
+import InvoicePaper, { type Line, type Entry } from "./cockpit/InvoicePaper";
 
 export default function Page() {
   // Notion stays synced through this hook: a background refetch on window focus and on a slow
@@ -266,62 +262,7 @@ export default function Page() {
       <div className="stage">
         <aside className="rail">
           <h2>Sessions in range</h2>
-          <div id="ledger">
-            {!visible.length ? (
-              <p style={{ color: "var(--dim)", fontSize: 12, padding: "8px 2px" }}>
-                {data ? `No sessions between ${from} and ${to}.` : "Loading sessions…"}
-              </p>
-            ) : (
-              days.map((day) => {
-                const dayRows = [...visible].sort(byDayDesc).filter((r) => r.date === day);
-                const dayH = dayRows.reduce(
-                  (s, r) => s + (picked.has(r.url) ? r.hours : 0),
-                  0
-                );
-                return (
-                  <div className="day" key={day}>
-                    <div className="day-head">
-                      <span className="d">{day}</span>
-                      <span className="h">{dayH ? dayH.toFixed(2) + " h" : "—"}</span>
-                    </div>
-                    {dayRows.map((r) => {
-                      const locked = isTerminal(r.status);
-                      return (
-                        <label
-                          className={`sess ${picked.has(r.url) ? "on" : ""} ${
-                            locked ? "locked" : ""
-                          }`}
-                          key={r.url}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={picked.has(r.url)}
-                            onChange={() => toggle(r.url)}
-                          />
-                          <span>
-                            <span className="sid">{r.sid}</span>
-                            <span className="meta">
-                              <span style={{ flexBasis: "100%" }}>
-                                {r.start} – {r.end}
-                                {r.location ? " · " + r.location : ""}
-                              </span>
-                              <StatusLed status={r.status} />
-                              <span className="statuslabel">{r.status}</span>
-                              {!r.billable && <span className="nobill">· non-billable</span>}
-                            </span>
-                          </span>
-                          <span className="amt">
-                            <b>{r.hours.toFixed(2)} h</b>
-                            <span>{money(r.hours * r.rate)}</span>
-                          </span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                );
-              })
-            )}
-          </div>
+          <SessionManifest days={days} visible={visible} picked={picked} onToggle={toggle} />
 
           <div className="runner">
             <div className="row">
@@ -341,258 +282,50 @@ export default function Page() {
           </div>
 
           <h2>Invoice</h2>
-          <div className="opt">
-            <div className="field">
-              <label htmlFor="invno">Number</label>
-              <input
-                type="text"
-                id="invno"
-                value={invno}
-                onChange={(e) => setInvno(e.target.value)}
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="invdate">Invoice date</label>
-              <input
-                type="date"
-                id="invdate"
-                value={invdate}
-                onChange={(e) => {
-                  setInvdate(e.target.value);
-                  syncDue(terms, e.target.value);
-                }}
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="terms">Terms</label>
-              <select
-                id="terms"
-                value={terms}
-                onChange={(e) => {
-                  setTerms(e.target.value);
-                  syncDue(e.target.value, invdate);
-                }}
-              >
-                <option>Net 15</option>
-                <option>Net 30</option>
-                <option>Due on receipt</option>
-              </select>
-            </div>
-            <div className="field">
-              <label htmlFor="duedate">Due</label>
-              <input
-                type="date"
-                id="duedate"
-                value={duedate}
-                onChange={(e) => setDuedate(e.target.value)}
-              />
-            </div>
-          </div>
-          <div className="field">
-            <label htmlFor="detail">Work detail</label>
-            <select
-              id="detail"
-              value={mode}
-              onChange={(e) => setMode(e.target.value as Mode)}
-            >
-              <option value="invoice">Invoice descriptions (client-facing)</option>
-              <option value="summary">Summaries only (short)</option>
-              <option value="notes">Session notes (verbatim)</option>
-              <option value="none">Line items only</option>
-            </select>
-          </div>
-          <div className="field">
-            <label htmlFor="round">Hour rounding</label>
-            <select
-              id="round"
-              value={String(round)}
-              onChange={(e) => setRound(parseFloat(e.target.value))}
-            >
-              <option value="0">Exact (2 decimals)</option>
-              <option value="0.25">Nearest quarter hour</option>
-              <option value="0.1">Nearest tenth</option>
-            </select>
-          </div>
-          <label className="toggle">
-            <input
-              type="checkbox"
-              checked={showall}
-              onChange={(e) => setShowall(e.target.checked)}
-            />{" "}
-            Show non-billable and superseded
-          </label>
-          <label className="toggle">
-            <input
-              type="checkbox"
-              checked={showsid}
-              onChange={(e) => setShowsid(e.target.checked)}
-            />{" "}
-            Print session IDs on line items
-          </label>
+          <InvoiceControls
+            invno={invno}
+            invdate={invdate}
+            terms={terms}
+            duedate={duedate}
+            mode={mode}
+            round={round}
+            showall={showall}
+            showsid={showsid}
+            onInvno={setInvno}
+            onInvdate={(v) => {
+              setInvdate(v);
+              syncDue(terms, v);
+            }}
+            onTerms={(v) => {
+              setTerms(v);
+              syncDue(v, invdate);
+            }}
+            onDuedate={setDuedate}
+            onMode={setMode}
+            onRound={setRound}
+            onShowall={setShowall}
+            onShowsid={setShowsid}
+          />
 
           <h2>Data flags</h2>
-          <div className={`flags${flags.length ? "" : " clean"}`}>
-            {flags.length ? (
-              flags.map((f, i) => (
-                <p key={i}>
-                  <span dangerouslySetInnerHTML={{ __html: f }} />
-                </p>
-              ))
-            ) : (
-              <p>
-                <span>Nothing to flag. Selection is clean.</span>
-              </p>
-            )}
-          </div>
+          <DataFlags flags={flags} />
         </aside>
 
         <main className="paperstage">
-          <div className="paper">
-            {err && !data ? (
-              // Only a cold failure with nothing to show takes over the paper. A background
-              // refresh that fails while an invoice is already on screen keeps the invoice
-              // and reports the failure through the sync pill, rather than yanking the
-              // document out from under an edit.
-              <div className="loadstate">
-                <b>Notion read failed.</b>
-                {err.error}
-                {err.hint && <div className="hint">{err.hint}</div>}
-              </div>
-            ) : !data ? (
-              <div className="loadstate">Reading Notion…</div>
-            ) : !lines.length ? (
-              <div className="empty">
-                Pick sessions on the left and the invoice builds itself here.
-              </div>
-            ) : (
-              <>
-                <div className="inv-head">
-                  <div>
-                    <div className="lockup">
-                      {/* Plain img, not next/image, on purpose. next/image lazy-loads by
-                          default, and a letterhead that has not decoded yet when the
-                          print dialog opens prints as a blank box. Imported from
-                          public/brand/, never from brand-assets/, per CLAUDE.md. */}
-                      <img
-                        className="letterhead"
-                        src="/brand/bbb-logo-horizontal-black.png"
-                        width={3000}
-                        height={1000}
-                        loading="eager"
-                        decoding="sync"
-                        alt="Battle Bound Branding LLC"
-                      />
-                      <h1>Invoice</h1>
-                    </div>
-                    <div className="sub" contentEditable suppressContentEditableWarning>
-                      Independent contractor · digital systems &amp; automation
-                    </div>
-                  </div>
-                  <div className="inv-no">
-                    <div className="n">{invno}</div>
-                    <div className="dates">
-                      Issued {fmtDate(invdate)}
-                      <br />
-                      Due {fmtDate(duedate)} · {terms}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="parties">
-                  <div>
-                    <div className="k">From</div>
-                    <div className="v" contentEditable suppressContentEditableWarning>
-                      {data.from}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="k">Bill to</div>
-                    <div className="v" contentEditable suppressContentEditableWarning>
-                      {data.client.billTo}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="period">
-                  <span>Service period</span>
-                  <b>
-                    {fmtDate(lines[0].date)} – {fmtDate(lines[lines.length - 1].date)}
-                  </b>
-                </div>
-
-                <table className="items">
-                  <thead>
-                    <tr>
-                      <th>Date</th>
-                      <th>Description</th>
-                      <th style={{ textAlign: "right" }}>Hours</th>
-                      <th style={{ textAlign: "right" }}>Rate</th>
-                      <th style={{ textAlign: "right" }}>Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {lines.map((l) => (
-                      <tr key={l.url}>
-                        <td className="date-c">{shortDate(l.date)}</td>
-                        <td className="desc">
-                          <b>
-                            {l.start} – {l.end}
-                            {l.location && l.location !== "Not specified"
-                              ? " · " + l.location
-                              : ""}
-                          </b>
-                          {showsid && <small>{l.sid}</small>}
-                        </td>
-                        <td className="r">{l.billed.toFixed(2)}</td>
-                        <td className="r">{money(l.rate)}</td>
-                        <td className="r">{money(l.amount)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-
-                <div className="totals">
-                  <table>
-                    <tbody>
-                      <tr>
-                        <td>Billable hours</td>
-                        <td>{totalHours.toFixed(2)}</td>
-                      </tr>
-                      <tr>
-                        <td>Rate</td>
-                        <td>{rates.length === 1 ? money(rates[0]) + " / hr" : "mixed"}</td>
-                      </tr>
-                      <tr className="grand">
-                        <td>Total due</td>
-                        <td>{money(totalAmt)}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-
-                {entries.length > 0 && (
-                  <div className="detail">
-                    <h3>Work performed</h3>
-                    {entries.map((e, i) => (
-                      <div className="entry" key={i}>
-                        <h4>{e.h}</h4>
-                        <div className="stamp">{e.stamp}</div>
-                        <p>{e.body}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <div className="foot">
-                  <span>{data.client.name}</span>
-                  <span>
-                    {invno} · {lines.length} session{lines.length > 1 ? "s" : ""} ·{" "}
-                    {totalHours.toFixed(2)} h
-                  </span>
-                </div>
-              </>
-            )}
-          </div>
+          <InvoicePaper
+            data={data}
+            err={err}
+            lines={lines}
+            entries={entries}
+            invno={invno}
+            invdate={invdate}
+            duedate={duedate}
+            terms={terms}
+            totalHours={totalHours}
+            totalAmt={totalAmt}
+            rates={rates}
+            showsid={showsid}
+          />
         </main>
       </div>
     </div>
