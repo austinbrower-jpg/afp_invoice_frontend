@@ -61,6 +61,9 @@ export default function InvoicePaper(props: {
             </div>
             <div>
               <div className="k">Bill to</div>
+              <img className="billto-logo" src="/brand/afp-logo-horizontal-black.png"
+                width={202} height={35} loading="eager" decoding="sync"
+                alt="Anytime Fuel Pros" />
               <div className="v" contentEditable suppressContentEditableWarning>{data.client.billTo}</div>
             </div>
           </div>

@@ -1210,6 +1210,16 @@ table.manifest td.st {
 .parties .v strong {
   font-weight: 600;
 }
+/* The client logo sits above the bill-to address, the AFP counterpart to the Battle
+   Bound letterhead up top. Sized in inches like the letterhead because this is a print
+   artifact: at 1.15in the 202px source is never upscaled. The source is a dark recolor
+   of the client's white-on-transparent logo, so it reads on the white paper. */
+.parties .billto-logo {
+  width: 1.15in;
+  height: auto;
+  display: block;
+  margin-bottom: 7px;
+}
 
 .period {
   background: #f3f4f7;
