@@ -1559,6 +1559,32 @@ table.items .desc small {
   }
 }
 
+/* Phone: the console stacks above a scaled-down paper preview. Building a full invoice is a
+   desktop act; on a phone you check hours, earnings, and what is owed, and can still Save PDF.
+   The paper keeps its true 8.5in width for print correctness and is visually scaled only on
+   screen at this width. */
+@media (max-width: 720px) {
+  .cockpit-console {
+    padding: 14px 12px 30px;
+  }
+  .paperstage {
+    padding: 16px;
+    height: auto;
+    overflow-x: auto;
+  }
+  .paper {
+    transform: scale(0.62);
+    transform-origin: top center;
+    margin-bottom: -22%;
+  }
+}
+@media print {
+  .paper {
+    transform: none;
+    margin-bottom: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     transition: none !important;
