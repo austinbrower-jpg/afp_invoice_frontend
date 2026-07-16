@@ -1676,6 +1676,30 @@ table.items .desc small {
 .set-row:hover { color: var(--tx); }
 .set-row.on { color: var(--tx); border-color: var(--amber); }
 
+/* ---------- layouts ----------
+   Balanced is the base cockpit. The other two re-weight instruments vs paper, keyed on the root
+   data-layout attribute. Pure CSS. The paper never changes shape (it is a print artifact); in
+   Instruments focus the full paper is hidden on screen and a compact summary shows instead, but
+   the paper stays in the DOM so print is unaffected. */
+
+/* Invoice focus: slim the instruments, widen the paper. */
+:root[data-layout="invoice"] .cockpit-top .mod { display: none; }            /* hide the day trace */
+:root[data-layout="invoice"] .cockpit-top .gauges { grid-template-columns: repeat(4, 1fr); }
+:root[data-layout="invoice"] .cockpit-top .g { padding: 8px 12px; }
+:root[data-layout="invoice"] .cockpit-top .g .v { font-size: 20px; margin-top: 4px; }
+:root[data-layout="invoice"] .cockpit-top .g .u { display: none; }
+:root[data-layout="invoice"] .cockpit-console .dial-card,
+:root[data-layout="invoice"] .cockpit-console .earn,
+:root[data-layout="invoice"] .cockpit-console .earn-h { display: none; }
+:root[data-layout="invoice"] .cockpit-split { grid-template-columns: 300px 1fr; }
+
+/* Instruments focus: enlarge the trace and dial, hide the full paper, show the summary card. */
+:root[data-layout="instruments"] .cockpit-top .mod-b { padding-bottom: 22px; }
+:root[data-layout="instruments"] .cockpit-split { grid-template-columns: 380px 1fr; }
+:root[data-layout="instruments"] .paperstage .paper { display: none; }
+:root[data-layout="instruments"] .invoice-summary { display: flex; }
+/* the summary card is display:none by default (Task 7), shown only here */
+
 @media (prefers-reduced-motion: reduce) {
   * {
     transition: none !important;

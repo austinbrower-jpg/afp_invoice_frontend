@@ -309,7 +309,7 @@ export default function Page() {
             <div className="row total"><span>Amount</span><b className="mono">{money(shownAmt)}</b></div>
           </div>
 
-          <h2>Earnings by week</h2>
+          <h2 className="earn-h">Earnings by week</h2>
           <EarningsByWeek weeks={weeks} />
 
           <h2>Invoice</h2>
