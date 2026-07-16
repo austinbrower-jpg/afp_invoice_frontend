@@ -4,7 +4,11 @@
 // to redirect to.
 
 import { NextRequest, NextResponse } from "next/server";
-import { COOKIE_NAME, verify } from "@/lib/auth";
+// Relative import, not the "@/" alias. Vercel's edge-function bundler for middleware
+// does not always resolve tsconfig path aliases, even though Next's own build does; a
+// relative path sidesteps that deployment-only failure mode. Only matters here because
+// middleware runs on the Edge runtime, which gets a separate bundling pass.
+import { COOKIE_NAME, verify } from "./lib/auth";
 
 const OPEN_PATHS = ["/login", "/api/login"];
 
