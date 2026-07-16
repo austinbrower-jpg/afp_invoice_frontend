@@ -1696,7 +1696,9 @@ table.items .desc small {
 /* Instruments focus: enlarge the trace and dial, hide the full paper, show the summary card. */
 :root[data-layout="instruments"] .cockpit-top .mod-b { padding-bottom: 22px; }
 :root[data-layout="instruments"] .cockpit-split { grid-template-columns: 380px 1fr; }
-:root[data-layout="instruments"] .paperstage .paper { display: none; }
+@media screen {
+  :root[data-layout="instruments"] .paperstage .paper { display: none; }
+}
 :root[data-layout="instruments"] .invoice-summary { display: flex; }
 /* the summary card is display:none by default (Task 7), shown only here */
 
