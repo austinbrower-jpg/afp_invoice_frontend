@@ -1404,10 +1404,15 @@ table.items .desc small {
   .topbar,
   .rail,
   .printwipe,
-  .deck {
+  .deck,
+  .cockpit-top,
+  .cockpit-console {
     display: none !important;
   }
   .stage {
+    display: block;
+  }
+  .cockpit-split {
     display: block;
   }
   .paperstage {
@@ -1511,6 +1516,49 @@ table.items .desc small {
   font-size: 12px;
   padding: 6px 2px;
 }
+
+/* ---------- cockpit ----------
+   The unified screen: instrument cluster across the top, then a split of the session and
+   earnings console on the left and the live paper on the right. Reuses the console tokens.
+   Layout A from the design spec. */
+.cockpit-top {
+  padding: 16px 16px 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cockpit-split {
+  display: grid;
+  grid-template-columns: 400px 1fr;
+  align-items: start;
+}
+.cockpit-console {
+  border-right: 1px solid var(--line);
+  height: calc(100vh - 59px);
+  overflow-y: auto;
+  padding: 18px 16px 60px;
+}
+.cockpit-console h2 {
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  margin-bottom: 12px;
+}
+.cockpit-console h2 + h2,
+.cockpit-console .earn + h2,
+.cockpit-console .runner + h2 {
+  margin-top: 26px;
+}
+@media (max-width: 1100px) {
+  .cockpit-split {
+    grid-template-columns: 1fr;
+  }
+  .cockpit-console {
+    height: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     transition: none !important;

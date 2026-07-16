@@ -9,7 +9,6 @@
 // anything here is a change to the deliverable.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import {
   addDays,
   fmtDate,
@@ -27,9 +26,12 @@ import {
   unbilledStart,
   type Mode,
 } from "@/lib/selection";
+import { weeklyEarnings } from "@/lib/hours";
 import { useAfpData } from "./useAfpData";
 import { useCountUp } from "./useCountUp";
 import { SyncStatus } from "./SyncStatus";
+import InstrumentCluster from "./cockpit/InstrumentCluster";
+import EarningsByWeek from "./cockpit/EarningsByWeek";
 import SessionManifest from "./cockpit/SessionManifest";
 import InvoiceControls from "./cockpit/InvoiceControls";
 import DataFlags from "./cockpit/DataFlags";
@@ -53,6 +55,15 @@ export default function Page() {
   const [round, setRound] = useState(0);
   const [showall, setShowall] = useState(false);
   const [showsid, setShowsid] = useState(true);
+
+  // Client-resolved today, the same pattern the dashboard uses: server and client can
+  // disagree on the date near midnight, so this waits for the client clock after mount
+  // rather than trusting a server-rendered value. The instrument cluster renders at rest
+  // until this resolves.
+  const [today2, setToday2] = useState<string | null>(null);
+  useEffect(() => {
+    setToday2(todayISO());
+  }, []);
 
   /* ---------- boot: default to everything not yet invoiced ----------
      Runs exactly once, when the first payload arrives. Later background refreshes from
@@ -183,6 +194,11 @@ export default function Page() {
 
   const flags = useMemo(() => (data ? buildFlags(data, selected) : []), [data, selected]);
 
+  const weeks = useMemo(
+    () => (data && today2 ? weeklyEarnings(data, today2, 6) : []),
+    [data, today2]
+  );
+
   const runnerHours = selected.reduce((s, r) => s + roundHours(r.hours, round), 0);
   const runnerAmt = selected.reduce((s, r) => s + roundHours(r.hours, round) * r.rate, 0);
 
@@ -212,99 +228,52 @@ export default function Page() {
       {wiping && <div className="printwipe run" aria-hidden="true" />}
       <div className="topbar">
         <div className="brand">
-          <b>Invoice Builder</b>
+          <b>AFP Cockpit</b>
           <span>{data?.client.name ?? "Anytime Fuel Pros"}</span>
         </div>
-        <Link href="/dashboard" className="chip">
-          Dashboard
-        </Link>
         <div className="rangebox">
           <label htmlFor="from">From</label>
-          <input
-            type="date"
-            id="from"
-            value={from}
-            onChange={(e) => setRange(e.target.value, to)}
-          />
+          <input type="date" id="from" value={from} onChange={(e) => setRange(e.target.value, to)} />
           <label htmlFor="to">To</label>
-          <input
-            type="date"
-            id="to"
-            value={to}
-            onChange={(e) => setRange(from, e.target.value)}
-          />
+          <input type="date" id="to" value={to} onChange={(e) => setRange(from, e.target.value)} />
           <div className="chips">
-            <button className="chip" onClick={() => preset("unbilled")}>
-              Unbilled
-            </button>
-            <button className="chip" onClick={() => preset("week")}>
-              This week
-            </button>
-            <button className="chip" onClick={() => preset("month")}>
-              This month
-            </button>
-            <button className="chip" onClick={() => preset("all")}>
-              All
-            </button>
+            <button className="chip" onClick={() => preset("unbilled")}>Unbilled</button>
+            <button className="chip" onClick={() => preset("week")}>This week</button>
+            <button className="chip" onClick={() => preset("month")}>This month</button>
+            <button className="chip" onClick={() => preset("all")}>All</button>
           </div>
         </div>
-        <SyncStatus
-          lastSynced={lastSynced}
-          refreshing={refreshing}
-          error={Boolean(err)}
-          onRefresh={refresh}
-        />
-        <button className="print-btn" onClick={savePdf}>
-          Save PDF
-        </button>
+        <SyncStatus lastSynced={lastSynced} refreshing={refreshing} error={Boolean(err)} onRefresh={refresh} />
+        <button className="print-btn" onClick={savePdf}>Save PDF</button>
       </div>
 
-      <div className="stage">
-        <aside className="rail">
+      <div className="cockpit-top">
+        <InstrumentCluster data={data} today={today2} />
+      </div>
+
+      <div className="cockpit-split">
+        <aside className="cockpit-console">
           <h2>Sessions in range</h2>
           <SessionManifest days={days} visible={visible} picked={picked} onToggle={toggle} />
 
           <div className="runner">
-            <div className="row">
-              <span>Selected</span>
-              <b className="mono">
-                {selected.length} session{selected.length === 1 ? "" : "s"}
-              </b>
-            </div>
-            <div className="row">
-              <span>Hours</span>
-              <b className="mono">{shownHours.toFixed(2)}</b>
-            </div>
-            <div className="row total">
-              <span>Amount</span>
-              <b className="mono">{money(shownAmt)}</b>
-            </div>
+            <div className="row"><span>Selected</span><b className="mono">{selected.length} session{selected.length === 1 ? "" : "s"}</b></div>
+            <div className="row"><span>Hours</span><b className="mono">{shownHours.toFixed(2)}</b></div>
+            <div className="row total"><span>Amount</span><b className="mono">{money(shownAmt)}</b></div>
           </div>
+
+          <h2>Earnings by week</h2>
+          <EarningsByWeek weeks={weeks} />
 
           <h2>Invoice</h2>
           <InvoiceControls
-            invno={invno}
-            invdate={invdate}
-            terms={terms}
-            duedate={duedate}
-            mode={mode}
-            round={round}
-            showall={showall}
-            showsid={showsid}
+            invno={invno} invdate={invdate} terms={terms} duedate={duedate}
+            mode={mode} round={round} showall={showall} showsid={showsid}
             onInvno={setInvno}
-            onInvdate={(v) => {
-              setInvdate(v);
-              syncDue(terms, v);
-            }}
-            onTerms={(v) => {
-              setTerms(v);
-              syncDue(v, invdate);
-            }}
+            onInvdate={(v) => { setInvdate(v); syncDue(terms, v); }}
+            onTerms={(v) => { setTerms(v); syncDue(v, invdate); }}
             onDuedate={setDuedate}
-            onMode={setMode}
-            onRound={setRound}
-            onShowall={setShowall}
-            onShowsid={setShowsid}
+            onMode={setMode} onRound={setRound} onShowall={setShowall} onShowsid={setShowsid}
           />
 
           <h2>Data flags</h2>
@@ -313,18 +282,9 @@ export default function Page() {
 
         <main className="paperstage">
           <InvoicePaper
-            data={data}
-            err={err}
-            lines={lines}
-            entries={entries}
-            invno={invno}
-            invdate={invdate}
-            duedate={duedate}
-            terms={terms}
-            totalHours={totalHours}
-            totalAmt={totalAmt}
-            rates={rates}
-            showsid={showsid}
+            data={data} err={err} lines={lines} entries={entries}
+            invno={invno} invdate={invdate} duedate={duedate} terms={terms}
+            totalHours={totalHours} totalAmt={totalAmt} rates={rates} showsid={showsid}
           />
         </main>
       </div>
