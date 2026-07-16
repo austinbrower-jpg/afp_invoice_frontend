@@ -1587,6 +1587,56 @@ table.items .desc small {
   }
 }
 
+/* ---------- themes ----------
+   Each theme overrides the console token values keyed on the root data-theme attribute. The
+   semantic names stay: --amber is worked, --hot is money owed, --ok is settled. So e.g. Ion sets
+   --amber to a cyan on purpose (renaming every token across all components is out of scope). No
+   theme touches the paper tokens; the paper is a separate system. Station is the base default in
+   the .station rule above, so it needs no block here. See the customization spec. */
+
+:root[data-theme="ion"] .station {
+  --bg: #080b12; --panel: #0f1620; --line: #1c2a38; --line-2: #2a3d50;
+  --tx: #c6d6e6; --dim: #5e7180; --dim-2: #3e4c58;
+  --amber: #38bdf8; --hot: #fb7185; --ok: #34d399;
+}
+:root[data-theme="ember"] .station {
+  --bg: #0e0a08; --panel: #1a1310; --line: #33241c; --line-2: #4a362a;
+  --tx: #e6d5c6; --dim: #8a7160; --dim-2: #5c4b3e;
+  --amber: #fbbf24; --hot: #e11d48; --ok: #2dd4bf;
+}
+:root[data-theme="daylight"] .station {
+  --bg: #f4f5f7; --panel: #ffffff; --line: #d8dce2; --line-2: #c2c8d0;
+  --tx: #1a1f26; --dim: #6b7480; --dim-2: #9aa1ab;
+  --amber: #b45309; --hot: #dc2626; --ok: #059669;
+}
+:root[data-theme="overdrive"] .station {
+  --bg: #070510; --panel: #130a26; --line: #2e1a50; --line-2: #452870;
+  --tx: #ece4ff; --dim: #8778b0; --dim-2: #5e5488;
+  --amber: #ff2e97; --hot: #ff3b57; --ok: #2ef2ff;
+}
+:root[data-theme="mono"] .station {
+  --bg: #0c0d0e; --panel: #141516; --line: #26282a; --line-2: #3a3d40;
+  --tx: #d4d6d8; --dim: #6a6e72; --dim-2: #4a4d50;
+  --amber: #b8bcc0; --hot: #c79a5a; --ok: #7e8286;
+}
+
+/* Overdrive: the badass one. Static CSS glow on the money and the worked figures, plus the
+   signal dots and fills. Static shadows (no animation), so they survive reduced motion. */
+:root[data-theme="overdrive"] .g.cash .v,
+:root[data-theme="overdrive"] .runner .row.total b {
+  text-shadow: 0 0 16px color-mix(in srgb, var(--hot) 75%, transparent);
+}
+:root[data-theme="overdrive"] .g.pri .v {
+  text-shadow: 0 0 14px color-mix(in srgb, var(--amber) 65%, transparent);
+}
+:root[data-theme="overdrive"] .led-ready,
+:root[data-theme="overdrive"] .led-paid {
+  box-shadow: 0 0 8px color-mix(in srgb, var(--ok) 70%, transparent);
+}
+:root[data-theme="overdrive"] .earn-fill.owed {
+  box-shadow: 0 0 10px color-mix(in srgb, var(--hot) 60%, transparent);
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     transition: none !important;
