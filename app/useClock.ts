@@ -38,6 +38,7 @@ export function useClock(onSaved: () => void) {
   const [error, setError] = useState<string | null>(null);
   const onSavedRef = useRef(onSaved);
   onSavedRef.current = onSaved;
+  const inFlightRef = useRef(false);
 
   // Resume a running clock after mount. localStorage is client only, so this cannot run during
   // render or on the server.
@@ -58,12 +59,13 @@ export function useClock(onSaved: () => void) {
   }, [state]);
 
   const clockIn = useCallback((location: string) => {
+    if (state) return;
     const s: ClockState = { startedAt: Date.now(), dateISO: todayISO(), location };
     window.localStorage.setItem(KEY, JSON.stringify(s));
     setError(null);
     setState(s);
     setNow(Date.now());
-  }, []);
+  }, [state]);
 
   const discard = useCallback(() => {
     window.localStorage.removeItem(KEY);
@@ -72,7 +74,8 @@ export function useClock(onSaved: () => void) {
   }, []);
 
   const clockOut = useCallback(async () => {
-    if (!state) return;
+    if (!state || inFlightRef.current) return;
+    inFlightRef.current = true;
     const start = new Date(state.startedAt);
     const endMs = Date.now();
     const end = new Date(endMs);
@@ -106,6 +109,7 @@ export function useClock(onSaved: () => void) {
       setError("Could not reach the server. Your clock is still running.");
     } finally {
       setSaving(false);
+      inFlightRef.current = false;
     }
   }, [state]);
 
