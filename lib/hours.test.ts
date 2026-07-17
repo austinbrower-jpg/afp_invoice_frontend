@@ -18,6 +18,7 @@ const wk = (over: Partial<Session>): Session => ({
 describe("weeklyEarnings", () => {
   const payload = (hours: Session[]): Payload => ({
     client: { name: "AFP", defaultRate: 30, timezone: "", billTo: "" },
+    activeClock: null,
     from: "", lastInvoice: null, hours, workDone: {},
   });
 

@@ -1,5 +1,15 @@
 import { describe, it, expect } from "vitest";
-import { hhmm, to12h, sessionId, hoursBetween, elapsed, validateClockPayload } from "@/lib/clock";
+import {
+  hhmm,
+  to12h,
+  sessionId,
+  hoursBetween,
+  elapsed,
+  validateClockPayload,
+  zonedParts,
+  zonedDateISO,
+  completeSession,
+} from "@/lib/clock";
 
 describe("clock helpers", () => {
   it("hhmm zero-pads", () => {
@@ -24,6 +34,43 @@ describe("clock helpers", () => {
   it("elapsed formats H:MM:SS", () => {
     expect(elapsed(0)).toBe("0:00:00");
     expect(elapsed(5_025_000)).toBe("1:23:45");
+  });
+});
+
+describe("zonedParts / completeSession (timezone-correct display)", () => {
+  // 2026-07-16 13:30 UTC is 08:30 in America/Chicago (CDT, UTC-5). This is the exact class of
+  // bug the feature fixes: the same instant must read as 8:30 AM in the business zone no matter
+  // what the device is set to.
+  const instant = Date.UTC(2026, 6, 16, 13, 30);
+
+  it("resolves an instant into wall-clock parts in the given zone", () => {
+    const p = zonedParts(instant, "America/Chicago");
+    expect(p).toMatchObject({ year: 2026, month: 7, day: 16, hour: 8, minute: 30 });
+    expect(zonedDateISO(p)).toBe("2026-07-16");
+  });
+
+  it("reads the same instant differently in a different zone", () => {
+    // Same instant, New York (EDT, UTC-4) is one hour ahead of Chicago.
+    expect(zonedParts(instant, "America/New_York").hour).toBe(9);
+  });
+
+  it("falls back to local time on an empty or bad zone rather than throwing", () => {
+    expect(() => zonedParts(instant, "")).not.toThrow();
+    expect(() => zonedParts(instant, "Not/AZone")).not.toThrow();
+  });
+
+  it("completeSession stamps display, id, and hours from the instants", () => {
+    const start = Date.UTC(2026, 6, 16, 13, 30); // 8:30 AM Chicago
+    const end = Date.UTC(2026, 6, 16, 16, 0); // 11:00 AM Chicago
+    const s = completeSession(start, end, "America/Chicago", "Remote");
+    expect(s.dateISO).toBe("2026-07-16");
+    expect(s.startDisplay).toBe("8:30 AM");
+    expect(s.endDisplay).toBe("11:00 AM");
+    expect(s.sessionId).toBe("AFP-2026-07-16-0830-1100");
+    expect(s.hours).toBeCloseTo(2.5, 10);
+    expect(s.location).toBe("Remote");
+    // And the result is a valid clock payload the API will accept.
+    expect(validateClockPayload(s).ok).toBe(true);
   });
 });
 

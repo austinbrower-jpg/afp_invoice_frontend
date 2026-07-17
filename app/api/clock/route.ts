@@ -1,11 +1,14 @@
-// POST /api/clock. The one write route, added 2026-07-16. Gated by middleware.ts like every
-// non-open path, so an unauthenticated call 401s before reaching here. Insert only: it writes
-// one Draft Hours Worked row and revalidates the read so the session appears at once.
+// POST /api/clock. The clock-out route, added 2026-07-16. Gated by middleware.ts like every
+// non-open path, so an unauthenticated call 401s before reaching here. It inserts one Draft
+// Hours Worked row (insert only, never updated) and then clears the shared running clock on
+// the Client page, so clocking out on any device ends the session everywhere. Clearing is
+// best effort: the billing row is the artifact that must not be lost, so a failed clear still
+// returns success with a warning rather than throwing the completed session away.
 // See docs/05-api-routes.md.
 
 import { revalidatePath } from "next/cache";
 import { validateClockPayload } from "@/lib/clock";
-import { insertSession } from "@/lib/notion";
+import { insertSession, clearActiveClock } from "@/lib/notion";
 
 export async function POST(req: Request) {
   let body: unknown;
@@ -18,10 +21,9 @@ export async function POST(req: Request) {
   if (!parsed.ok) {
     return Response.json({ error: parsed.error }, { status: 400 });
   }
+  let id: string;
   try {
-    const { id } = await insertSession(parsed.value);
-    revalidatePath("/api/notion/afp");
-    return Response.json({ id }, { status: 201 });
+    ({ id } = await insertSession(parsed.value));
   } catch (err) {
     const hint = err instanceof Error ? err.message : String(err);
     return Response.json(
@@ -29,4 +31,15 @@ export async function POST(req: Request) {
       { status: 502 }
     );
   }
+  let warning: string | undefined;
+  try {
+    await clearActiveClock();
+  } catch (err) {
+    // The session is already saved; surface the stuck clock but do not fail the request.
+    warning =
+      "Session saved, but the running clock could not be cleared. " +
+      (err instanceof Error ? err.message : String(err));
+  }
+  revalidatePath("/api/notion/afp");
+  return Response.json(warning ? { id, warning } : { id }, { status: 201 });
 }

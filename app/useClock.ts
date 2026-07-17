@@ -1,54 +1,47 @@
 "use client";
 
-// Owns the live clock. Only this in-progress value is persisted, under one localStorage key,
-// per the browser-storage amendment in docs/06-ui-spec.md. A completed session goes to Notion
-// through POST /api/clock and never to the browser. On a failed save the running clock is
-// kept, so nothing is lost.
+// Owns the live clock. As of 2026-07-17 the running clock lives in Notion (on the Client page,
+// via GET /api/notion/afp -> payload.activeClock), not in localStorage, so a clock-in on the
+// phone shows up on the laptop and can be clocked out there. This hook is now server-driven: it
+// adopts the activeClock from the payload, applies optimistic updates so the button feels
+// instant, and lets the next refresh confirm. A completed session still goes to Notion through
+// POST /api/clock and is inserted once, never updated.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { todayISO } from "@/lib/invoice";
-import { sessionId, to12h, hoursBetween, type ClockPayload } from "@/lib/clock";
+import type { ActiveClock } from "@/lib/notion";
+import { completeSession, zonedParts, zonedDateISO, type ClockPayload } from "@/lib/clock";
 
-const KEY = "afp.clock.v1";
+export type ClockState = { startedAt: number; location: string };
 
-export type ClockState = { startedAt: number; dateISO: string; location: string };
+const toState = (a: ActiveClock | null): ClockState | null =>
+  a ? { startedAt: Date.parse(a.startedAt), location: a.location } : null;
 
-function read(): ClockState | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(KEY);
-    if (!raw) return null;
-    const p = JSON.parse(raw);
-    if (
-      p && typeof p.startedAt === "number" &&
-      typeof p.dateISO === "string" && typeof p.location === "string"
-    ) {
-      return { startedAt: p.startedAt, dateISO: p.dateISO, location: p.location };
-    }
-  } catch {
-    // fall through
-  }
-  return null;
-}
+const todayInZone = (tz: string): string => zonedDateISO(zonedParts(Date.now(), tz));
 
-export function useClock(onSaved: () => void) {
-  const [state, setState] = useState<ClockState | null>(null);
+export function useClock(activeClock: ActiveClock | null, timezone: string, onSaved: () => void) {
+  const server = toState(activeClock);
+  const [state, setState] = useState<ClockState | null>(server);
   const [now, setNow] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const onSavedRef = useRef(onSaved);
   onSavedRef.current = onSaved;
   const inFlightRef = useRef(false);
 
-  // Resume a running clock after mount. localStorage is client only, so this cannot run during
-  // render or on the server.
+  // Adopt the server value only when it actually changes, so an optimistic update set below is
+  // not clobbered by a poll that raced the write. The key is the ISO instant (or "" for no
+  // clock); when it flips, a real refresh has landed and its value wins.
+  const serverKey = activeClock ? activeClock.startedAt : "";
+  const lastKeyRef = useRef(serverKey);
   useEffect(() => {
-    const s = read();
-    if (s) {
-      setState(s);
-      setNow(Date.now());
+    if (serverKey !== lastKeyRef.current) {
+      lastKeyRef.current = serverKey;
+      setState(toState(activeClock));
     }
-  }, []);
+    // activeClock is captured through serverKey; adopting on key change is the whole point.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverKey]);
 
   // Tick once a second while clocked in, for the elapsed readout.
   useEffect(() => {
@@ -58,37 +51,66 @@ export function useClock(onSaved: () => void) {
     return () => window.clearInterval(id);
   }, [state]);
 
-  const clockIn = useCallback((location: string) => {
-    if (state) return;
-    const s: ClockState = { startedAt: Date.now(), dateISO: todayISO(), location };
-    window.localStorage.setItem(KEY, JSON.stringify(s));
-    setError(null);
-    setState(s);
-    setNow(Date.now());
-  }, [state]);
+  const clockIn = useCallback(
+    async (location: string) => {
+      if (state || inFlightRef.current) return;
+      inFlightRef.current = true;
+      setStarting(true);
+      setError(null);
+      try {
+        const res = await fetch("/api/clock/start", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ location }),
+        });
+        const body = await res.json().catch(() => null);
+        if (!res.ok) {
+          setError(body && body.error ? String(body.error) : `Clock in failed (HTTP ${res.status}).`);
+          return;
+        }
+        // Optimistic: show the running clock now; the next refresh confirms the same instant.
+        setState({ startedAt: Date.parse(body.startedAt), location: body.location });
+        setNow(Date.now());
+        onSavedRef.current();
+      } catch {
+        setError("Could not reach the server. Try again.");
+      } finally {
+        setStarting(false);
+        inFlightRef.current = false;
+      }
+    },
+    [state]
+  );
 
-  const discard = useCallback(() => {
-    window.localStorage.removeItem(KEY);
-    setState(null);
+  const discard = useCallback(async () => {
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
     setError(null);
+    try {
+      const res = await fetch("/api/clock/discard", { method: "POST" });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        setError(body && body.error ? String(body.error) : `Discard failed (HTTP ${res.status}).`);
+        return;
+      }
+      setState(null);
+      onSavedRef.current();
+    } catch {
+      setError("Could not reach the server. Your clock is still running.");
+    } finally {
+      inFlightRef.current = false;
+    }
   }, []);
 
   const clockOut = useCallback(async () => {
     if (!state || inFlightRef.current) return;
     inFlightRef.current = true;
-    const start = new Date(state.startedAt);
-    const endMs = Date.now();
-    const end = new Date(endMs);
-    const payload: ClockPayload = {
-      dateISO: state.dateISO,
-      sessionId: sessionId(
-        state.dateISO, start.getHours(), start.getMinutes(), end.getHours(), end.getMinutes()
-      ),
-      startDisplay: to12h(start.getHours(), start.getMinutes()),
-      endDisplay: to12h(end.getHours(), end.getMinutes()),
-      hours: hoursBetween(state.startedAt, endMs),
-      location: state.location,
-    };
+    const payload: ClockPayload = completeSession(
+      state.startedAt,
+      Date.now(),
+      timezone,
+      state.location
+    );
     setSaving(true);
     setError(null);
     try {
@@ -102,8 +124,7 @@ export function useClock(onSaved: () => void) {
         setError(body && body.error ? String(body.error) : `Save failed (HTTP ${res.status}).`);
         return; // keep the running clock; nothing is lost
       }
-      window.localStorage.removeItem(KEY);
-      setState(null);
+      setState(null); // optimistic; the refresh confirms activeClock is now null
       onSavedRef.current();
     } catch {
       setError("Could not reach the server. Your clock is still running.");
@@ -111,10 +132,10 @@ export function useClock(onSaved: () => void) {
       setSaving(false);
       inFlightRef.current = false;
     }
-  }, [state]);
+  }, [state, timezone]);
 
-  const stale = Boolean(state && state.dateISO !== todayISO());
+  const stale = Boolean(state && zonedDateISO(zonedParts(state.startedAt, timezone)) !== todayInZone(timezone));
   const elapsedMs = state ? Math.max(0, now - state.startedAt) : 0;
 
-  return { state, elapsedMs, stale, saving, error, clockIn, clockOut, discard };
+  return { state, elapsedMs, stale, saving, starting, error, clockIn, clockOut, discard };
 }

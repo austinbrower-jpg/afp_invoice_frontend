@@ -20,12 +20,19 @@ billing history. It cannot rewrite it, because it was never granted that capabil
 ## Notion integration setup
 
 1. Create an internal integration at notion.so/my-integrations.
-2. Capabilities: **read content and insert content**. Turn off update content and delete.
-   The integration can add new rows (for clock-out), but cannot rewrite or delete
-   existing billing records. A leaked token with only read and insert is constrained:
-   it can add sessions but not alter or erase billing history.
+2. Capabilities: **read content, insert content, and update content**. Leave delete off.
+   - Read + insert cover the read path and the insert-only clock-out (one new Draft Hours
+     Worked row, never a rewrite of existing billing records).
+   - Update content was added 2026-07-17 for the cross-device clock (approach A): clock-in
+     and clock-out set and clear two properties (`Active Clock Start`, `Active Clock
+     Location`) on the Client page to hold the one shared running clock. This is the only
+     thing update covers; it never touches Hours Worked billing rows. Without it, clock-in
+     returns 502 with a hint pointing back here.
+   - Delete stays off. A leaked token still cannot erase billing history.
 3. **Share the integration with the `Invoice Details` page.** The three databases inherit
-   access from the parent.
+   access from the parent. The cross-device clock also writes the Client page, so the
+   integration must have access to the Clients database (it already does, since the app
+   reads it for the bill-to and rate).
 
 Step 3 is the single most common first-run failure. Without it, every query returns an
 empty result set with no error, and the app renders a working UI with no data in it, which

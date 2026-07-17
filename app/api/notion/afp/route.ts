@@ -1,13 +1,16 @@
 // GET /api/notion/afp
 //
-// The only route. Read-only: Notion is updated by hand on the Notion side, so there is
-// no POST, PATCH, or DELETE here and there never will be without a new decision.
+// The read route. Read-only itself: it never writes. The app's writes live in the sanctioned
+// clock routes (POST /api/clock, /api/clock/start, /api/clock/discard), each of which
+// revalidates this path so a clock change shows up here on the next fetch. This route also
+// carries the shared running clock (payload.activeClock) so every device reads the same clock.
 // See docs/05-api-routes.md.
 
 import { fetchPayload, NotionDataError } from "@/lib/notion";
 
-// Nothing this app does can invalidate the data, because it never writes. Cache hard
-// and share one fetch across every route rather than fetching per page.
+// Cached for 60s to shield Notion's rate limit, and busted on demand by the clock routes'
+// revalidatePath("/api/notion/afp") the moment a clock-in, clock-out, or discard writes, so a
+// clock change is never hidden behind the cache.
 export const revalidate = 60;
 
 export async function GET() {
