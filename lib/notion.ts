@@ -29,6 +29,12 @@ export type WorkDone = {
   invoice: string; // Invoice Description, the prose that prints
 };
 
+// The one running clock, shared across every device. It lives on the Client page (Active
+// Clock Start + Active Clock Location), not in a browser, so a clock-in on the phone is
+// visible on the laptop and can be clocked out there. startedAt is an absolute ISO instant;
+// the client resolves it into the business timezone for display. Null when not clocked in.
+export type ActiveClock = { startedAt: string; location: string };
+
 export type Payload = {
   client: {
     name: string;
@@ -36,6 +42,7 @@ export type Payload = {
     timezone: string;
     billTo: string;
   };
+  activeClock: ActiveClock | null;
   from: string;
   lastInvoice: { number: string; periodEnd: string } | null;
   hours: Session[];
@@ -251,8 +258,10 @@ export async function fetchPayload(): Promise<Payload> {
   assertDatesUsable(hours);
   hours.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
 
+  const clientRow = findClientRow(clientRows);
   return {
-    client: readClient(clientRows),
+    client: readClient(clientRow),
+    activeClock: readActiveClock(clientRow),
     from: FROM_BLOCK,
     lastInvoice: readLastInvoice(invoiceRows),
     hours,
@@ -285,7 +294,9 @@ function assertDatesUsable(hours: Session[]): void {
   );
 }
 
-function readClient(rows: any[]): Payload["client"] {
+// The single Clients row this tool bills, resolved once so readClient and readActiveClock
+// never diverge on which row they read.
+function findClientRow(rows: any[]): any {
   const wanted = process.env.NOTION_CLIENT_PAGE
     ? toPageId(process.env.NOTION_CLIENT_PAGE)
     : null;
@@ -297,6 +308,10 @@ function readClient(rows: any[]): Payload["client"] {
         "integration can read the Clients database. See docs/08-deploy.md."
     );
   }
+  return row;
+}
+
+function readClient(row: any): Payload["client"] {
   const p = row.properties as Props;
   return {
     name: text(p, "Name"),
@@ -304,6 +319,16 @@ function readClient(rows: any[]): Payload["client"] {
     timezone: text(p, "Timezone"),
     billTo: BILL_TO_BLOCK,
   };
+}
+
+// The running clock, read off the same Clients row. Start is the full ISO instant (not the
+// date-only slice dateStart returns), because the client needs the exact time to show the
+// elapsed readout and to stamp the completed session. Empty Start means not clocked in.
+function readActiveClock(row: any): ActiveClock | null {
+  const p = row.properties as Props;
+  const startedAt = p["Active Clock Start"]?.date?.start ?? "";
+  if (!startedAt) return null;
+  return { startedAt, location: text(p, "Active Clock Location") || "Remote" };
 }
 
 // The Invoice Reports row with the highest Invoice Number, sorted as a string. Used to
@@ -362,4 +387,32 @@ export async function insertSession(input: ClockPayload): Promise<{ id: string }
     properties: buildSessionProperties(input, requireEnv("NOTION_CLIENT_PAGE")) as any,
   } as any);
   return { id: page.id };
+}
+
+// The active-clock write path, added 2026-07-17 with the owner's sign-off (cross-device clock,
+// approach A). This is a second sanctioned write, separate from the insert-only clock-out
+// above: it sets and clears two properties on the Client page to hold the one running clock so
+// it is shared across devices. It never touches the Hours Worked billing history, so the
+// insert-only rule for completed sessions still holds. Setting the clock stamps an absolute
+// instant; the client resolves it to the business timezone for display.
+export async function setActiveClock(startedAt: string, location: string): Promise<void> {
+  const client = new Client({ auth: requireEnv("NOTION_TOKEN") });
+  await client.pages.update({
+    page_id: requireEnv("NOTION_CLIENT_PAGE"),
+    properties: {
+      "Active Clock Start": { date: { start: startedAt } },
+      "Active Clock Location": { rich_text: [{ text: { content: location } }] },
+    },
+  } as any);
+}
+
+export async function clearActiveClock(): Promise<void> {
+  const client = new Client({ auth: requireEnv("NOTION_TOKEN") });
+  await client.pages.update({
+    page_id: requireEnv("NOTION_CLIENT_PAGE"),
+    properties: {
+      "Active Clock Start": { date: null },
+      "Active Clock Location": { rich_text: [] },
+    },
+  } as any);
 }

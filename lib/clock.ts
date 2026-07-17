@@ -15,6 +15,77 @@ export function to12h(h: number, m: number): string {
   return `${hour}:${pad2(m)} ${mer}`;
 }
 
+// Break an absolute instant into wall-clock parts in a specific IANA timezone. The clock
+// stores the clock-in as an absolute instant, so the displayed start and end must be
+// resolved in the business timezone (America/Chicago, from the client's Timezone property),
+// not in whatever timezone the device happens to be set to. Doing it here, off the instant,
+// is what keeps a session read the same on the phone and the laptop and stops the times from
+// drifting by the device-versus-business offset. Uses Intl, which is present in the browser
+// and in Node. Falls back to the device local time when the zone is missing or unrecognized,
+// rather than throwing.
+export type ZonedParts = { year: number; month: number; day: number; hour: number; minute: number };
+
+export function zonedParts(instantMs: number, timeZone: string): ZonedParts {
+  const d = new Date(instantMs);
+  if (timeZone) {
+    try {
+      const parts = new Intl.DateTimeFormat("en-US", {
+        timeZone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      }).formatToParts(d);
+      const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+      return {
+        year: Number(get("year")),
+        month: Number(get("month")),
+        day: Number(get("day")),
+        // Some engines emit "24" for midnight under hour12:false. Fold it back to 0.
+        hour: Number(get("hour")) % 24,
+        minute: Number(get("minute")),
+      };
+    } catch {
+      // Unrecognized zone: fall through to local.
+    }
+  }
+  return {
+    year: d.getFullYear(),
+    month: d.getMonth() + 1,
+    day: d.getDate(),
+    hour: d.getHours(),
+    minute: d.getMinutes(),
+  };
+}
+
+export function zonedDateISO(p: ZonedParts): string {
+  return `${p.year}-${pad2(p.month)}-${pad2(p.day)}`;
+}
+
+// The completed session an in-progress clock becomes when it stops. Pure: both instants and
+// the zone in, one validated ClockPayload out, so the same computation can be unit tested and
+// reused by the clock control without duplicating the timezone math.
+export function completeSession(
+  startMs: number,
+  endMs: number,
+  timeZone: string,
+  location: string
+): ClockPayload {
+  const sp = zonedParts(startMs, timeZone);
+  const ep = zonedParts(endMs, timeZone);
+  const dateISO = zonedDateISO(sp);
+  return {
+    dateISO,
+    sessionId: sessionId(dateISO, sp.hour, sp.minute, ep.hour, ep.minute),
+    startDisplay: to12h(sp.hour, sp.minute),
+    endDisplay: to12h(ep.hour, ep.minute),
+    hours: hoursBetween(startMs, endMs),
+    location,
+  };
+}
+
 export function sessionId(dateISO: string, sh: number, sm: number, eh: number, em: number): string {
   return `AFP-${dateISO}-${hhmm(sh, sm)}-${hhmm(eh, em)}`;
 }

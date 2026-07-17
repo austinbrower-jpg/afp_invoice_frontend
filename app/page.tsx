@@ -293,7 +293,11 @@ export default function Page() {
             <button className="chip" onClick={() => preset("all")}>All</button>
           </div>
         </div>
-        <ClockControl onSaved={refresh} />
+        <ClockControl
+          activeClock={data?.activeClock ?? null}
+          timezone={data?.client.timezone ?? ""}
+          onSaved={refresh}
+        />
         <SyncStatus lastSynced={lastSynced} refreshing={refreshing} error={Boolean(err)} onRefresh={refresh} />
         <SettingsPanel
           settings={settings}
