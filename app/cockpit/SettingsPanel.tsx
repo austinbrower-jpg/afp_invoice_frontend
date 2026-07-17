@@ -13,7 +13,9 @@ const THEMES: { id: ThemeName; label: string }[] = [
   { id: "ion", label: "Ion" },
   { id: "ember", label: "Ember" },
   { id: "daylight", label: "Daylight" },
-  { id: "overdrive", label: "Overdrive" },
+  // id stays "overdrive" so saved selections keep resolving; the theme was retuned from
+  // neon magenta to an ice-blue "Glacier" palette on 2026-07-17.
+  { id: "overdrive", label: "Glacier" },
   { id: "mono", label: "Mono" },
 ];
 const LAYOUTS: { id: LayoutName; label: string }[] = [

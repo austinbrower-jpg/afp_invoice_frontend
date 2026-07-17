@@ -1629,10 +1629,15 @@ table.items .desc small {
   --tx: #1a1f26; --dim: #6b7480; --dim-2: #9aa1ab;
   --amber: #b45309; --hot: #dc2626; --ok: #059669;
 }
+/* Glacier (id kept as "overdrive" so saved selections and localStorage keep working).
+   Retuned 2026-07-17 off the neon-magenta original, which was too saturated to focus on a
+   dark field and caused eye strain. Ice blue accent on a deep slate field: same cool cyber
+   mood, far easier on the eyes. --amber is ice blue here, --ok emerald, --hot a soft rose
+   kept only for money owed / the now hairline per docs/10. */
 :root[data-theme="overdrive"] .station {
-  --bg: #070510; --panel: #130a26; --line: #2e1a50; --line-2: #452870;
-  --tx: #ece4ff; --dim: #8778b0; --dim-2: #5e5488;
-  --amber: #ff2e97; --hot: #ff3b57; --ok: #2ef2ff;
+  --bg: #070c14; --panel: #0e1620; --line: #1b2a3a; --line-2: #294056;
+  --tx: #d8e6f2; --dim: #7089a0; --dim-2: #47596c;
+  --amber: #7dd3fc; --hot: #fb7185; --ok: #34d399;
 }
 :root[data-theme="mono"] .station {
   --bg: #0c0d0e; --panel: #141516; --line: #26282a; --line-2: #3a3d40;
@@ -1640,21 +1645,44 @@ table.items .desc small {
   --amber: #b8bcc0; --hot: #c79a5a; --ok: #7e8286;
 }
 
-/* Overdrive: the badass one, leveled up. All static CSS (glow + gradient + lit panels), scoped
-   to this theme and to the console (never the paper, never print). No animation, so nothing to
-   drop under reduced motion and zero perf cost. In this theme --amber is magenta and --ok cyan. */
+/* Glacier: the cool cyber theme. Glow + gradient + lit panels, scoped to this theme and to
+   the console (never the paper, never print). In this theme --amber is ice blue and --ok
+   emerald, so the neon reads cold rather than hot. Shimmer and breathing glow (added below)
+   are gentle infinite CSS loops, no render loop, and drop under reduced motion via the global
+   reset. */
 
-/* Gradient text on the hero figures (KPI values, dial value, running total). The glow is a
-   drop-shadow, not a text-shadow, so it shadows the gradient-clipped glyphs rather than
-   defaulting to the now-transparent text color. */
+/* Gradient text on the hero figures (KPI values, dial value, running total), with a slow
+   sheen sweeping through it. background-size is doubled so there is room for the position to
+   travel; the glow is a drop-shadow, not a text-shadow, so it shadows the gradient-clipped
+   glyphs rather than defaulting to the now-transparent text color. */
 :root[data-theme="overdrive"] .g .v,
 :root[data-theme="overdrive"] .gauge-value,
 :root[data-theme="overdrive"] .runner .row.total b {
-  background: linear-gradient(120deg, var(--amber), var(--ok));
+  background: linear-gradient(
+    110deg,
+    var(--amber) 0%,
+    var(--ok) 35%,
+    #eaf6ff 50%,
+    var(--ok) 65%,
+    var(--amber) 100%
+  );
+  background-size: 220% 100%;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  filter: drop-shadow(0 0 12px color-mix(in srgb, var(--amber) 55%, transparent));
+  filter: drop-shadow(0 0 12px color-mix(in srgb, var(--amber) 45%, transparent));
+  animation: iceSheen 6s ease-in-out infinite;
+}
+/* The sheen rests off-screen most of the cycle and passes through once, so it is a slow
+   glint rather than a constant strobe. Slower and lower-contrast on the small running total. */
+@keyframes iceSheen {
+  0%,
+  100% {
+    background-position: 140% 50%;
+  }
+  50% {
+    background-position: -40% 50%;
+  }
 }
 
 /* Full neon spread: light up the instruments themselves, not just the figures. */
@@ -1688,7 +1716,7 @@ table.items .desc small {
   box-shadow: 0 0 8px color-mix(in srgb, var(--ok) 55%, transparent);
 }
 
-/* Lit panels: a faint magenta edge-glow so each module reads as powered. Kept low so it stays
+/* Lit panels: a faint ice-blue edge-glow so each module reads as powered. Kept low so it stays
    atmospheric rather than garish. */
 :root[data-theme="overdrive"] .g,
 :root[data-theme="overdrive"] .mod,
@@ -1698,6 +1726,90 @@ table.items .desc small {
 :root[data-theme="overdrive"] .invoice-summary {
   box-shadow: 0 0 22px color-mix(in srgb, var(--amber) 10%, transparent);
   border-color: color-mix(in srgb, var(--amber) 22%, var(--line));
+}
+
+/* Breathing glow on the two live signals only (the now hairline and the clock's running dot),
+   so "alive" reads as a slow pulse instead of a static dot. Small elements, gentle delta, kept
+   off every large surface on purpose so the theme never feels like it is flickering. Each
+   pulses in its own color: the now hairline is --hot, the clock dot is --amber. */
+:root[data-theme="overdrive"] .now {
+  animation: iceBreatheHot 3.4s ease-in-out infinite;
+}
+:root[data-theme="overdrive"] .clock-dot {
+  animation: iceBreatheAmber 3.4s ease-in-out infinite;
+}
+@keyframes iceBreatheHot {
+  0%,
+  100% {
+    box-shadow: 0 0 5px color-mix(in srgb, var(--hot) 55%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 12px color-mix(in srgb, var(--hot) 85%, transparent);
+  }
+}
+@keyframes iceBreatheAmber {
+  0%,
+  100% {
+    box-shadow: 0 0 5px color-mix(in srgb, var(--amber) 50%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 12px color-mix(in srgb, var(--amber) 85%, transparent);
+  }
+}
+
+/* ---------- entrance + hover motion (all themes) ----------
+   One-shot reveal on the instrument cluster and console cards, staggered so the panel
+   assembles on load rather than snapping in. Pure CSS, runs once on mount, no render loop.
+   Hover lift is a bounded transition, desktop only. Both drop under reduced motion via the
+   global reset above. Scoped to console surfaces; the paper and print are untouched. */
+@keyframes riseIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.cockpit-top .g,
+.cockpit-top .mod,
+.cockpit-console .dial-card,
+.cockpit-console .runner,
+.cockpit-console .earn,
+.cockpit-console .flags {
+  animation: riseIn 460ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+/* Stagger the four KPI tiles, then bring the day trace in just after them. */
+.cockpit-top .g:nth-child(1) {
+  animation-delay: 40ms;
+}
+.cockpit-top .g:nth-child(2) {
+  animation-delay: 100ms;
+}
+.cockpit-top .g:nth-child(3) {
+  animation-delay: 160ms;
+}
+.cockpit-top .g:nth-child(4) {
+  animation-delay: 220ms;
+}
+.cockpit-top .mod {
+  animation-delay: 300ms;
+}
+
+/* Cards lift a hair on hover. Desktop affordance, a no-op on touch, so it never fights a tap. */
+.g,
+.mod,
+.dial-card,
+.runner {
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+@media (hover: hover) {
+  .cockpit-top .g:hover,
+  .cockpit-console .dial-card:hover,
+  .cockpit-console .runner:hover {
+    transform: translateY(-2px);
+  }
 }
 
 /* ---------- settings panel ---------- */
@@ -1731,7 +1843,7 @@ table.items .desc small {
 .sw-ion { background: #080b12; box-shadow: inset 0 -6px 0 #38bdf8; }
 .sw-ember { background: #0e0a08; box-shadow: inset 0 -6px 0 #fbbf24; }
 .sw-daylight { background: #f4f5f7; box-shadow: inset 0 -6px 0 #b45309; }
-.sw-overdrive { background: #070510; box-shadow: inset 0 -6px 0 #ff2e97; }
+.sw-overdrive { background: #070c14; box-shadow: inset 0 -6px 0 #7dd3fc; }
 .sw-mono { background: #0c0d0e; box-shadow: inset 0 -6px 0 #b8bcc0; }
 .set-rows { display: flex; flex-direction: column; gap: 4px; }
 .set-row {
