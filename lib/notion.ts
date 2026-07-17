@@ -336,7 +336,13 @@ export function buildSessionProperties(
   clientPageId: string
 ): Record<string, unknown> {
   return {
+    // Write both the Date title and the Session Date date property. The app filters and sorts
+    // every session on Session Date (see sessionDate() and gap 1 in docs/07-data-gaps.md), not
+    // on this title. A row with no Session Date sorts out of every range and trips
+    // assertDatesUsable on read, so the session would be invisible. The title is only the human
+    // label. Do not drop Session Date.
     Date: { title: [{ text: { content: input.dateISO } }] },
+    "Session Date": { date: { start: input.dateISO } },
     "Session ID": { rich_text: [{ text: { content: input.sessionId } }] },
     "Start Time": { rich_text: [{ text: { content: input.startDisplay } }] },
     "End Time": { rich_text: [{ text: { content: input.endDisplay } }] },
