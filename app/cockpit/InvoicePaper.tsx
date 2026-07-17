@@ -34,24 +34,24 @@ export default function InvoicePaper(props: {
       ) : (
         <>
           <div className="inv-head">
-            <div>
-              <div className="lockup">
-                <img className="letterhead" src="/brand/bbb-logo-horizontal-black.png"
-                  width={3000} height={1000} loading="eager" decoding="sync"
-                  alt="Battle Bound Branding LLC" />
-                <h1>Invoice</h1>
+            <img className="letterhead" src="/brand/bbb-logo-horizontal-black.png"
+              width={3000} height={1000} loading="eager" decoding="sync"
+              alt="Battle Bound Branding LLC" />
+            <div className="inv-title">
+              <h1>Invoice</h1>
+              <div className="inv-no">
+                <span className="n">{invno}</span>
+                <span className="dates">
+                  Issued {fmtDate(invdate)} · Due {fmtDate(duedate)} · {terms}
+                </span>
               </div>
               <div className="sub" contentEditable suppressContentEditableWarning>
                 Independent contractor · digital systems &amp; automation
               </div>
             </div>
-            <div className="inv-no">
-              <div className="n">{invno}</div>
-              <div className="dates">
-                Issued {fmtDate(invdate)}<br />
-                Due {fmtDate(duedate)} · {terms}
-              </div>
-            </div>
+            <img className="client-logo" src="/brand/afp-logo-color.png"
+              width={1160} height={976} loading="eager" decoding="sync"
+              alt="Anytime Fuel Pros" />
           </div>
 
           <div className="parties">
@@ -61,9 +61,6 @@ export default function InvoicePaper(props: {
             </div>
             <div>
               <div className="k">Bill to</div>
-              <img className="billto-logo" src="/brand/afp-logo-horizontal-black.png"
-                width={202} height={35} loading="eager" decoding="sync"
-                alt="Anytime Fuel Pros" />
               <div className="v" contentEditable suppressContentEditableWarning>{data.client.billTo}</div>
             </div>
           </div>
