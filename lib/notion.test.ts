@@ -16,6 +16,11 @@ describe("buildSessionProperties", () => {
   it("writes the ISO date as the title", () => {
     expect(p["Date"].title[0].text.content).toBe("2026-07-16");
   });
+  it("sets the Session Date the app filters on", () => {
+    // The app reads Session Date, not the Date title, so a session with no Session Date is
+    // invisible in every range and trips assertDatesUsable. Regression guard for that bug.
+    expect(p["Session Date"].date.start).toBe("2026-07-16");
+  });
   it("stores raw hours and a 30 rate", () => {
     expect(p["Total Hours"].number).toBe(1.4);
     expect(p["Hourly Rate"].number).toBe(30);

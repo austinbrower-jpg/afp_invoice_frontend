@@ -27,7 +27,8 @@ exists. Do not build a switcher.
 
 | Property | Type | Notes |
 |---|---|---|
-| `Date` | **title** | Text, not a date type. Holds ISO `YYYY-MM-DD`. See gap 1. |
+| `Date` | **title** | Text, not a date type. Holds ISO `YYYY-MM-DD`. Human label only. See gap 1. |
+| `Session Date` | date | Real date property added 2026-07-16 for gap 1. This is what the app filters and sorts sessions on, not the Date title. Any written row must set this or it sorts out of every range and trips the read-time date check. |
 | `Session ID` | text | e.g. `AFP-2026-07-15-0700-1438` |
 | `Start Time` | text | Inconsistent: `7:00 AM` and `07:00` both appear |
 | `End Time` | text | Same |
