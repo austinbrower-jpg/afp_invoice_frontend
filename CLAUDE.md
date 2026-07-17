@@ -8,8 +8,11 @@ the workspace and is correct. Do not guess at Notion property names.
 
 - `NOTION_TOKEN` is server-side only. Never `NEXT_PUBLIC_`. Never reaches the client
   bundle. If a component needs Notion data, it comes through an API route.
-- This app is read-only. It never writes to Notion. If a task seems to need a write, stop
-  and ask rather than adding one.
+- This app is read-only for billing history, with one sanctioned exception decided
+  2026-07-16: the insert-only `POST /api/clock` clock-out path, which adds one Draft Hours
+  Worked row and never updates or deletes. See `docs/05-api-routes.md`. Any further write
+  path is a new decision, not an extension of this one. If a task seems to need a write
+  beyond that, stop and ask rather than adding one.
 - Do not deploy before auth exists. See `docs/08-deploy.md`.
 - Do not add a database before caching has been tried and measured. See the Neon section
   in `docs/02-architecture.md`. Notion is the source of truth for this tool.

@@ -15,9 +15,10 @@ Worked, Work Done, Invoice Reports, Invoice Dashboard, Report Builder), Work Stu
 Settings, plus a live timer. It is slow. These docs describe the target state, not the
 current code. Read the existing repo before trusting any of them.
 
-**Read-only.** Notion is updated by hand on the Notion side. This app never writes. That
-removes the write-back route, the double-billing guard, and every partial-failure concern,
-and it means the data can be cached hard because nothing invalidates it.
+**Read-only, with one exception.** Notion is updated by hand on the Notion side. The only
+write is the insert-only clock-out (`POST /api/clock`), which adds a single Draft Hours
+Worked row and never updates or deletes; see `docs/05-api-routes.md`. Everything else only
+reads, so the data can be cached hard because reads never invalidate it.
 
 `prototype/invoice-builder.html` is the invoice generator: full UI, print CSS, and
 calculation logic, seeded with a real Notion snapshot from 2026-07-15. Port it, do not
