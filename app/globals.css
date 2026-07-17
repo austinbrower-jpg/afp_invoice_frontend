@@ -1772,3 +1772,69 @@ table.items .desc small {
     animation: none !important;
   }
 }
+
+/* Clock in / out control. Lives in the topbar, so the @media print block hides it with the
+   rest of the console chrome. Amber marks the running state, matching the dial. */
+.clock-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.clock-loc {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--dim);
+  font-family: var(--data);
+  font-size: 11px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.clock-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--tx);
+  font-family: var(--ui);
+  font-weight: 600;
+  font-size: 13px;
+  padding: 8px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: border-color 120ms ease;
+}
+.clock-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+.clock-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.clock-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.clock-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--amber);
+}
+.clock-elapsed {
+  font-family: var(--data);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--tx);
+}
+.clock-since,
+.clock-warn,
+.clock-err {
+  font-family: var(--data);
+  font-size: 11px;
+}
+.clock-since { color: var(--dim); }
+.clock-warn,
+.clock-err { color: var(--amber); }

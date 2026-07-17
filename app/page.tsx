@@ -32,6 +32,7 @@ import { useCountUp } from "./useCountUp";
 import { useSettings } from "./useSettings";
 import { SyncStatus } from "./SyncStatus";
 import { SettingsPanel } from "./cockpit/SettingsPanel";
+import ClockControl from "./cockpit/ClockControl";
 import InstrumentCluster from "./cockpit/InstrumentCluster";
 import { HoursGauge } from "./dashboard/HoursGauge";
 import EarningsByWeek from "./cockpit/EarningsByWeek";
@@ -292,6 +293,7 @@ export default function Page() {
             <button className="chip" onClick={() => preset("all")}>All</button>
           </div>
         </div>
+        <ClockControl onSaved={refresh} />
         <SyncStatus lastSynced={lastSynced} refreshing={refreshing} error={Boolean(err)} onRefresh={refresh} />
         <SettingsPanel
           settings={settings}
