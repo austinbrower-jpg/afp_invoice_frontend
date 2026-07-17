@@ -30,3 +30,38 @@ export function elapsed(ms: number): string {
   const s = total % 60;
   return `${h}:${pad2(m)}:${pad2(s)}`;
 }
+
+export type ClockPayload = {
+  dateISO: string;
+  sessionId: string;
+  startDisplay: string;
+  endDisplay: string;
+  hours: number;
+  location: string;
+};
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const MAX_HOURS = 24;
+
+export function validateClockPayload(
+  body: unknown
+): { ok: true; value: ClockPayload } | { ok: false; error: string } {
+  if (!body || typeof body !== "object") return { ok: false, error: "Body must be an object." };
+  const b = body as Record<string, unknown>;
+  const str = (k: string) => (typeof b[k] === "string" ? (b[k] as string).trim() : "");
+  const dateISO = str("dateISO");
+  const sessionId = str("sessionId");
+  const startDisplay = str("startDisplay");
+  const endDisplay = str("endDisplay");
+  const location = str("location");
+  const hours = typeof b.hours === "number" ? b.hours : NaN;
+
+  if (!ISO_DATE.test(dateISO)) return { ok: false, error: "dateISO must be YYYY-MM-DD." };
+  if (!sessionId) return { ok: false, error: "sessionId is required." };
+  if (!startDisplay || !endDisplay) return { ok: false, error: "start and end times are required." };
+  if (!location) return { ok: false, error: "location is required." };
+  if (!Number.isFinite(hours) || hours <= 0 || hours >= MAX_HOURS) {
+    return { ok: false, error: "hours must be greater than 0 and less than 24." };
+  }
+  return { ok: true, value: { dateISO, sessionId, startDisplay, endDisplay, hours, location } };
+}
