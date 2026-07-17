@@ -47,6 +47,10 @@
 body {
   background: #0a0c10;
   -webkit-font-smoothing: antialiased;
+  /* Safety net, not the fix: the real overflow sources are handled at each source below
+     (rangebox, chips, settings-pop). This just guarantees a stray future one cannot force
+     the whole page to scroll sideways on a phone. */
+  overflow-x: hidden;
 }
 .station {
   background: var(--bg);
@@ -188,6 +192,27 @@ body {
 .print-btn:disabled {
   opacity: 0.4;
   cursor: default;
+}
+
+/* Phone: the topbar's From/To range and filter chips are a single unbroken flex row on
+   desktop by design (docs/10 gives the console freedom desktop has room for), but that row
+   is wider than a phone screen and, being a flex child with the default min-width:auto,
+   refused to shrink and forced the whole page to scroll sideways instead. Letting it wrap,
+   and dropping the auto right-margin that only makes sense when it has room to float right
+   of the brand, keeps every control reachable without horizontal scroll. */
+@media (max-width: 640px) {
+  .topbar {
+    gap: 10px;
+  }
+  .rangebox {
+    margin-left: 0;
+    width: 100%;
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  .chips {
+    flex-wrap: wrap;
+  }
 }
 
 /* ---------- layout ---------- */
@@ -1062,7 +1087,7 @@ table.manifest td.st {
 .login-card {
   display: grid;
   gap: 16px;
-  width: 300px;
+  width: min(300px, 100%);
   background: var(--panel);
   border: 1px solid var(--line);
   border-top: 2px solid var(--amber);
@@ -1684,8 +1709,12 @@ table.items .desc small {
   transition: color 120ms ease, border-color 120ms ease;
 }
 .gear:hover { color: var(--tx); border-color: var(--amber); }
+/* Portaled to <body> (see SettingsPanel.tsx) so position:fixed resolves against the real
+   viewport, not the topbar, whose backdrop-filter would otherwise hijack it as the
+   containing block. top/right come in as inline style, measured off the gear button. */
 .settings-pop {
-  position: absolute; top: 42px; right: 0; z-index: 40; width: 260px;
+  position: fixed; z-index: 40; width: 260px; max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 32px); overflow-y: auto;
   background: var(--panel); border: 1px solid var(--line-2); border-radius: 10px;
   padding: 14px; display: flex; flex-direction: column; gap: 16px;
   box-shadow: 0 12px 40px rgba(0,0,0,.5);
@@ -1713,6 +1742,18 @@ table.items .desc small {
 }
 .set-row:hover { color: var(--tx); }
 .set-row.on { color: var(--tx); border-color: var(--amber); }
+
+/* Phone: the gear can land almost anywhere horizontally once the topbar wraps, and a fixed
+   260px-wide panel measured off its right edge can still run past the left edge of a narrow
+   viewport. Below this width, drop the JS-measured horizontal anchor (the vertical one,
+   just below the gear, still holds) and pin the panel edge-to-edge with a margin instead. */
+@media (max-width: 640px) {
+  .settings-pop {
+    left: 16px !important;
+    right: 16px !important;
+    width: auto;
+  }
+}
 
 /* ---------- layouts ----------
    Balanced is the base cockpit. The other two re-weight instruments vs paper, keyed on the root
