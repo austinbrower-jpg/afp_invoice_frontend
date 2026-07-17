@@ -146,4 +146,8 @@ live workspace and against the invoice builder's own `DATA` const:
 ## Quality floor
 
 Responsive down to a single column under 1100px. Visible keyboard focus. Reduced motion
-respected. No browser storage of Notion or billing data. UI preferences (theme, layout, dial metric) may be stored in localStorage under a single key, per docs/superpowers/specs/2026-07-16-cockpit-customization-design.md.
+respected. No browser storage of Notion or billing data. UI preferences (theme, layout, dial metric)
+may be stored in localStorage under a single key. The in-progress clock (start time, date,
+location) may be stored under one key `afp.clock.v1`, cleared on clock-out; completed
+sessions and billing history still never touch the browser. See
+docs/superpowers/specs/2026-07-16-clock-in-out-design.md.

@@ -20,9 +20,10 @@ billing history. It cannot rewrite it, because it was never granted that capabil
 ## Notion integration setup
 
 1. Create an internal integration at notion.so/my-integrations.
-2. Capabilities: **read content only**. Turn off update content and insert content. This
-   app never writes, so a write-capable token is pure downside. A leaked read token is a
-   bad day. A leaked write token is someone rewriting your billing records.
+2. Capabilities: **read content and insert content**. Turn off update content and delete.
+   The integration can add new rows (for clock-out), but cannot rewrite or delete
+   existing billing records. A leaked token with only read and insert is constrained:
+   it can add sessions but not alter or erase billing history.
 3. **Share the integration with the `Invoice Details` page.** The three databases inherit
    access from the parent.
 
