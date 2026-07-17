@@ -43,11 +43,19 @@ export function SettingsPanel({
 }) {
   const [open, setOpen] = useState(false);
   // Anchor coordinates for the popover, measured off the gear button once it opens. The
-  // popover itself is portaled to <body> (see below) so it escapes the topbar, whose
-  // backdrop-filter otherwise turns it into the containing block for any position:fixed
-  // descendant, silently repositioning "the viewport" to "the 60px-tall topbar" and
-  // pinning the popover to the top of the page instead of under the gear.
+  // popover is portaled out of the topbar, whose backdrop-filter otherwise turns it into the
+  // containing block for any position:fixed descendant, silently repositioning "the viewport"
+  // to "the 60px-tall topbar" and pinning the popover to the top of the page instead of under
+  // the gear.
+  //
+  // It portals into the nearest .station element, NOT document.body. Every color and font
+  // token (--panel, --tx, --line-2, --data, and the per-theme overrides) is scoped to
+  // .station, so a popover mounted at document.body renders with no background and default
+  // black serif text: var(--panel) resolves to nothing outside that scope. The .station
+  // wrapper has no transform/filter of its own, so a fixed child of it still resolves against
+  // the viewport, keeping the containing-block fix while restoring the tokens.
   const [anchor, setAnchor] = useState<{ top: number; right: number } | null>(null);
+  const [host, setHost] = useState<HTMLElement | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
   const popRef = useRef<HTMLDivElement>(null);
@@ -56,6 +64,7 @@ export function SettingsPanel({
     if (!open || !btnRef.current) return;
     const r = btnRef.current.getBoundingClientRect();
     setAnchor({ top: r.bottom + 8, right: window.innerWidth - r.right });
+    setHost((ref.current?.closest(".station") as HTMLElement) ?? document.body);
   }, [open]);
 
   useEffect(() => {
@@ -89,6 +98,7 @@ export function SettingsPanel({
       </button>
       {open &&
         anchor &&
+        host &&
         createPortal(
           <div
             className="settings-pop"
@@ -139,7 +149,7 @@ export function SettingsPanel({
               </select>
             </div>
           </div>,
-          document.body
+          host
         )}
     </div>
   );
