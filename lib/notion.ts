@@ -323,3 +323,37 @@ function readLastInvoice(rows: any[]): Payload["lastInvoice"] {
     periodEnd: dateStart(p, "Period End"),
   };
 }
+
+import type { ClockPayload } from "@/lib/clock";
+
+// The one write path, added 2026-07-16 (docs/07-data-gaps.md gap 4, and the read-only rule
+// reversal recorded in docs/05-api-routes.md). Insert only: one Draft row per clock-out.
+// Draft is the safety net, since Draft never bills until the row is marked Reviewed.
+const HOURLY_RATE = 30;
+
+export function buildSessionProperties(
+  input: ClockPayload,
+  clientPageId: string
+): Record<string, unknown> {
+  return {
+    Date: { title: [{ text: { content: input.dateISO } }] },
+    "Session ID": { rich_text: [{ text: { content: input.sessionId } }] },
+    "Start Time": { rich_text: [{ text: { content: input.startDisplay } }] },
+    "End Time": { rich_text: [{ text: { content: input.endDisplay } }] },
+    "Total Hours": { number: input.hours },
+    "Hourly Rate": { number: HOURLY_RATE },
+    Billable: { checkbox: true },
+    "Billing Status": { select: { name: "Draft" } },
+    Location: { rich_text: [{ text: { content: input.location } }] },
+    Client: { relation: [{ id: clientPageId }] },
+  };
+}
+
+export async function insertSession(input: ClockPayload): Promise<{ id: string }> {
+  const client = new Client({ auth: requireEnv("NOTION_TOKEN") });
+  const page = await client.pages.create({
+    parent: { type: "data_source_id", data_source_id: requireEnv("NOTION_DS_HOURS") },
+    properties: buildSessionProperties(input, requireEnv("NOTION_CLIENT_PAGE")) as any,
+  } as any);
+  return { id: page.id };
+}
