@@ -7,6 +7,12 @@ out/
 build/
 next-env.d.ts
 
+# playwright (print/PDF regression run artifacts)
+test-results/
+playwright-report/
+blob-report/
+.playwright/
+
 # typescript
 *.tsbuildinfo
 

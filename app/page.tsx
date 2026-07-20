@@ -42,6 +42,24 @@ import DataFlags from "./cockpit/DataFlags";
 import InvoicePaper, { type Entry } from "./cockpit/InvoicePaper";
 import { InvoiceSummary } from "./cockpit/InvoiceSummary";
 
+// Print readiness. window.print() captures whatever is painted at the instant it is called, so
+// the Save PDF flow gates on the paper's fonts and images actually being ready rather than on a
+// fixed delay. A cold load could otherwise render the invoice in a fallback font, or capture a
+// half-decoded letterhead, and freeze that into the PDF. See docs/06-ui-spec.md.
+function waitMs(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+// Resolves once the webfonts have loaded and both paper logos have decoded. Images that are
+// already complete resolve immediately; decode() failures resolve too, so a broken asset never
+// deadlocks the print button.
+function paperReady(): Promise<void> {
+  const fonts = document.fonts?.ready ?? Promise.resolve();
+  const imgs = Array.from(document.querySelectorAll<HTMLImageElement>(".paper img")).map((img) =>
+    img.complete && img.naturalWidth > 0 ? Promise.resolve() : img.decode().catch(() => undefined)
+  );
+  return Promise.all([fonts, ...imgs]).then(() => undefined);
+}
+
 export default function Page() {
   // Notion stays synced through this hook: a background refetch on window focus and on a slow
   // interval, plus a manual refresh, all hitting the same 60s-cached route. It replaces the
@@ -256,22 +274,50 @@ export default function Page() {
   const days = [...new Set([...visible].sort(byDayDesc).map((r) => r.date))];
 
   const [wiping, setWiping] = useState(false);
-  const savePdf = () => {
+  // Guards a second Save PDF from firing while the first is still preparing (waiting on the
+  // fonts/images gate or mid-wipe). A ref, not state, so a re-render never clears it mid-flight.
+  const preparing = useRef(false);
+
+  // Reset once the print dialog closes, whether the user saved or cancelled. window.print()
+  // blocks until then in most browsers, but afterprint is the reliable signal in the ones where
+  // it returns early, so clear here as well. Both paths are idempotent.
+  useEffect(() => {
+    const done = () => {
+      preparing.current = false;
+      setWiping(false);
+    };
+    window.addEventListener("afterprint", done);
+    return () => window.removeEventListener("afterprint", done);
+  }, []);
+
+  const savePdf = useCallback(async () => {
     // Nothing selected means the paper is showing the "pick sessions" prompt, not an invoice.
     // Printing here produced a blank page. Refuse rather than save an empty PDF; the button is
     // also disabled in this state, this guards the reduced-motion and programmatic paths too.
-    if (!lines.length) return;
+    // preparing.current blocks a double click while a print is already being set up.
+    if (!lines.length || preparing.current) return;
+    preparing.current = true;
+
     const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    // Kick off the readiness wait immediately so fonts and logos load while the wipe plays.
+    const ready = paperReady();
+
     if (reduce) {
+      // No wipe under reduced motion, but still wait for the paper to be ready before printing.
+      await ready;
       window.print();
+      preparing.current = false;
       return;
     }
+
     setWiping(true);
-    window.setTimeout(() => {
-      window.print();
-      setWiping(false);
-    }, 270);
-  };
+    // Print once BOTH the paper is ready and the wipe has had its moment. The 270ms is a floor
+    // for the animation, never the sole readiness gate: a slow font or image still holds print.
+    await Promise.all([ready, waitMs(270)]);
+    window.print();
+    setWiping(false);
+    preparing.current = false;
+  }, [lines.length]);
 
   return (
     <div className="station">

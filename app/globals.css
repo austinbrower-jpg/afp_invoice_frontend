@@ -1584,8 +1584,14 @@ table.items .desc small {
 /* Phone: the console stacks above a scaled-down paper preview. Building a full invoice is a
    desktop act; on a phone you check hours, earnings, and what is owed, and can still Save PDF.
    The paper keeps its true 8.5in width for print correctness and is visually scaled only on
-   screen at this width. */
-@media (max-width: 720px) {
+   screen at this width.
+
+   Scoped to `screen` on purpose. A bare `@media (max-width: 720px)` defaults to media type
+   `all`, so it also matched during print: a Letter page inside 0.5in margins is exactly 7.5in
+   = 720px wide, so this block's transform, negative margin, and paperstage overflow leaked
+   into the PDF. Restricting it to screen keeps the phone preview and removes it from print.
+   The authoritative print reset at the end of this file is the belt to this suspenders. */
+@media screen and (max-width: 720px) {
   .cockpit-console {
     padding: 14px 12px 30px;
   }
@@ -1598,12 +1604,6 @@ table.items .desc small {
     transform: scale(0.62);
     transform-origin: top center;
     margin-bottom: -22%;
-  }
-}
-@media print {
-  .paper {
-    transform: none;
-    margin-bottom: 0;
   }
 }
 
@@ -1981,3 +1981,60 @@ table.items .desc small {
 .clock-since { color: var(--dim); }
 .clock-warn,
 .clock-err { color: var(--amber); }
+
+/* ---------- authoritative print reset (must stay last) ----------
+   This block exists because the earlier @media print block near the top of the file is NOT
+   the last word on layout: the cockpit grid (.cockpit-split { display: grid }), the responsive
+   console rules, the phone paper preview, and the data-layout column overrides are all declared
+   AFTER it. At equal specificity source order wins, so in print .cockpit-split stayed a
+   400px | 1fr grid and, with the console hidden, the paper auto-placed into the 400px console
+   track. That is what collapsed the whole invoice into a narrow vertical column, wrapped the
+   subtitle one word per line, and blew the document out to five pages.
+
+   Keeping this at the very end guarantees it wins by source order; the !important guards also
+   beat the higher-specificity :root[data-layout] column rules. It restores the print flow to a
+   single full-width column so the paper fills the printable Letter width inside the @page
+   margins. Do not move it above the screen layout rules and do not delete it. The @page rule
+   and the page-break rules in the first @media print block above are still the deliverable and
+   are untouched. */
+@media print {
+  html,
+  body,
+  .station {
+    width: 100% !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    overflow: visible !important;
+  }
+  /* Kill the two-column cockpit grid so the paper stops landing in the console track. Block
+     flow at full width is all print needs; the console and summary are display:none above. */
+  .stage,
+  .cockpit-split,
+  .paperstage {
+    display: block !important;
+    width: 100% !important;
+    max-width: none !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    grid-template-columns: none !important;
+  }
+  /* The paper itself: strip every screen-only affordance (mobile scale/origin/margin, the
+     drop shadow, the fixed 8.5in width, flex-shrink:0) and let it fill 100% of the printable
+     area. width:100% resolves against the @page content box (7.5in inside 0.5in margins), so
+     this never creates an 8.5in element inside an already margin-reduced print area. */
+  .paper {
+    transform: none !important;
+    transform-origin: initial !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    min-height: 0 !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+    flex-shrink: initial !important;
+  }
+}
