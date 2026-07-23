@@ -176,7 +176,7 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 // match the builder's terminal set (Invoiced, Paid, Superseded). Kept in lockstep on purpose:
 // the whole point of the dashboard "Unbilled" figure is that it equals what the builder would
 // bill, and a Paid row leaking in here was re-opening the double-billing the builder just closed.
-const BILLED_STATUSES = new Set(["Invoiced", "Paid"]);
+const BILLED_STATUSES = new Set(["invoiced", "paid"]);
 
 export type Unbilled = {
   hours: number;
@@ -199,7 +199,7 @@ export function unbilledSessions(payload: Payload, today: string): Session[] {
   return payload.hours.filter(
     (s) =>
       isLive(s) &&
-      !BILLED_STATUSES.has(s.status) &&
+      !BILLED_STATUSES.has(s.billingStatus) &&
       s.date <= today &&
       (validEnd ? s.date > validEnd : s.date >= monthStart)
   );
@@ -265,7 +265,7 @@ export function weeklyEarnings(payload: Payload, today: string, weeks = 6): Week
     const dollars = s.hours * s.rate;
     w.hours += s.hours;
     w.amount += dollars;
-    if (BILLED_STATUSES.has(s.status)) w.collected += dollars;
+    if (BILLED_STATUSES.has(s.billingStatus)) w.collected += dollars;
     else w.owed += dollars;
   }
 

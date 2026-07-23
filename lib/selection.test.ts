@@ -20,18 +20,23 @@ const s = (over: Partial<Session>): Session => ({
   rate: 30,
   billable: true,
   status: "Reviewed",
+  billingStatus: "unbilled",
+  invoiceNumber: null,
+  invoicedAt: null,
+  paidAt: null,
   location: null,
   work: [],
   notes: null,
   ...over,
+  id: over.id ?? "id-u",
 });
 
 describe("eligibility and selection", () => {
   it("isTerminal covers Invoiced, Paid, Superseded only", () => {
-    expect(isTerminal("Invoiced")).toBe(true);
-    expect(isTerminal("Paid")).toBe(true);
-    expect(isTerminal("Superseded")).toBe(true);
-    expect(isTerminal("Reviewed")).toBe(false);
+    expect(isTerminal(s({ billingStatus: "invoiced" }))).toBe(true);
+    expect(isTerminal(s({ billingStatus: "paid" }))).toBe(true);
+    expect(isTerminal(s({ status: "Superseded" }))).toBe(true);
+    expect(isTerminal(s({ status: "Reviewed", billingStatus: "unbilled" }))).toBe(false);
   });
 
   it("eligible hides non-billable and superseded unless showall", () => {
@@ -43,7 +48,7 @@ describe("eligibility and selection", () => {
   it("autoSelect picks billable, in-range, non-terminal rows", () => {
     const rows = [
       s({ url: "a", date: "2026-07-14", status: "Reviewed" }),
-      s({ url: "b", date: "2026-07-14", status: "Paid" }),
+      s({ url: "b", date: "2026-07-14", billingStatus: "paid", status: "Paid" }),
       s({ url: "c", date: "2026-07-01", status: "Reviewed" }),
     ];
     const picked = autoSelect(rows, "2026-07-13", "2026-07-15", false);
@@ -73,4 +78,14 @@ describe("eligibility and selection", () => {
     expect(flags.join(" ")).toContain("AFP-9");
     expect(flags.join(" ")).toContain("no linked Work Done");
   });
+});
+
+it("does not auto-select invoiced or paid rows after date-range changes", () => {
+  const rows = [
+    s({ url: "unbilled", billingStatus: "unbilled" }),
+    s({ url: "invoiced", billingStatus: "invoiced", invoiceNumber: "AFP-2026-001" }),
+    s({ url: "paid", billingStatus: "paid", invoiceNumber: "AFP-2026-001", paidAt: "2026-07-20T00:00:00.000Z" }),
+  ];
+  const picked = autoSelect(rows, "2026-07-01", "2026-07-31", true);
+  expect([...picked]).toEqual(["unbilled"]);
 });

@@ -19,9 +19,9 @@ export const inRange = (r: Session, from: string, to: string) =>
 // Statuses that must never land on a new invoice. Invoiced and Paid are already on an
 // invoice, so re-billing either double bills; Superseded is a dead duplicate. One set so
 // eligible, autoSelect, the row lock, and buildFlags cannot drift apart.
-export const BILLED_STATUSES = new Set(["Invoiced", "Paid"]);
-export const isTerminal = (status: string): boolean =>
-  BILLED_STATUSES.has(status) || status === "Superseded";
+export const BILLED_STATUSES = new Set(["invoiced", "paid"]);
+export const isTerminal = (r: Pick<Session, "status" | "billingStatus">): boolean =>
+  BILLED_STATUSES.has(r.billingStatus) || r.status === "Superseded";
 
 // The day after the last invoice's period, or the month start when there is no last invoice
 // or its Period End is empty or unreadable. Guarding the date keeps addDays from emitting a
@@ -41,7 +41,7 @@ export function autoSelect(hours: Session[], from: string, to: string, showall: 
   const next = new Set<string>();
   hours
     .filter((r) => inRange(r, from, to) && eligible(r, showall))
-    .filter((r) => r.billable && !isTerminal(r.status))
+    .filter((r) => r.billable && !isTerminal(r))
     .forEach((r) => next.add(r.url));
   return next;
 }
@@ -70,10 +70,10 @@ export function buildFlags(data: Payload, rows: Session[]): string[] {
       f.push(`Work Done "<b>${esc(w.title)}</b>" is still <b>${esc(w.approval)}</b>, not Approved.`);
   });
   rows
-    .filter((r) => BILLED_STATUSES.has(r.status))
+    .filter((r) => BILLED_STATUSES.has(r.billingStatus))
     .forEach((r) =>
       f.push(
-        `<b>${esc(r.sid)}</b> is already marked <b>${esc(r.status)}</b>${
+        `<b>${esc(r.sid)}</b> is already marked <b>${esc(r.billingStatus)}</b>${
           data.lastInvoice ? ` (on ${esc(data.lastInvoice.number)})` : ""
         }. Double billing risk.`
       )

@@ -2038,3 +2038,6 @@ table.items .desc small {
     flex-shrink: initial !important;
   }
 }
+.sess.paid {
+  opacity: 0.62;
+}
