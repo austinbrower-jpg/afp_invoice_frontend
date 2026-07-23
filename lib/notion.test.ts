@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildSessionProperties } from "@/lib/notion";
+import { buildBillingUpdateProperties, buildSessionProperties } from "@/lib/notion";
 import type { ClockPayload } from "@/lib/clock";
 
 const input: ClockPayload = {
@@ -25,11 +25,32 @@ describe("buildSessionProperties", () => {
     expect(p["Total Hours"].number).toBe(1.4);
     expect(p["Hourly Rate"].number).toBe(30);
   });
-  it("marks the row billable and Draft", () => {
+  it("marks the row billable and Unbilled", () => {
     expect(p["Billable"].checkbox).toBe(true);
-    expect(p["Billing Status"].select.name).toBe("Draft");
+    expect(p["Billing Status"].select.name).toBe("Unbilled");
   });
   it("relates to the client page", () => {
     expect(p["Client"].relation[0].id).toBe("client-page-id");
+  });
+});
+
+
+describe("buildBillingUpdateProperties", () => {
+  it("marks an invoice paid with invoice number and paid timestamp", () => {
+    const p = buildBillingUpdateProperties("paid", "AFP-2026-003", "2026-07-20T12:00:00.000Z") as any;
+    expect(p["Billing Status"].select.name).toBe("Paid");
+    expect(p["Invoice Number"].rich_text[0].text.content).toBe("AFP-2026-003");
+    expect(p["Paid At"].date.start).toBe("2026-07-20T12:00:00.000Z");
+  });
+  it("moves a paid invoice back to invoiced without clearing the invoice number", () => {
+    const p = buildBillingUpdateProperties("invoiced", "AFP-2026-003", "2026-07-21T12:00:00.000Z") as any;
+    expect(p["Billing Status"].select.name).toBe("Invoiced");
+    expect(p["Invoice Number"].rich_text[0].text.content).toBe("AFP-2026-003");
+    expect(p["Paid At"].date).toBeNull();
+  });
+  it("clears invoice fields only when explicitly changed back to unbilled", () => {
+    const p = buildBillingUpdateProperties("unbilled") as any;
+    expect(p["Billing Status"].select.name).toBe("Unbilled");
+    expect(p["Invoice Number"].rich_text).toEqual([]);
   });
 });

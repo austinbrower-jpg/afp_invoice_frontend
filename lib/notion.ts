@@ -4,7 +4,10 @@
 
 import { Client } from "@notionhq/client";
 
+export type BillingStatus = "unbilled" | "invoiced" | "paid";
+
 export type Session = {
+  id: string; // Notion page ID. Used for sanctioned billing-status writes.
   url: string; // Notion page URL. The stable key. Never use Session ID as a key.
   date: string; // "2026-07-15"
   sid: string; // Session ID, human-entered, display only
@@ -14,7 +17,11 @@ export type Session = {
   hours: number; // raw float from Total Hours, unrounded
   rate: number;
   billable: boolean;
-  status: string; // Billing Status, verbatim
+  status: string; // Legacy Billing Status, verbatim, kept for Superseded/Draft/Reviewed display.
+  billingStatus: BillingStatus; // Persistent invoice lifecycle used for selection and totals.
+  invoiceNumber: string | null;
+  invoicedAt: string | null;
+  paidAt: string | null;
   location: string | null;
   work: string[]; // Work Done page IDs, dashes stripped
   notes: string | null;
@@ -167,6 +174,52 @@ const dateStart = (p: Props, key: string): string =>
 const relationIds = (p: Props, key: string): string[] =>
   (p[key]?.relation ?? []).map((r: any) => toPageId(r.id ?? ""));
 
+export function readBillingStatus(p: Props): BillingStatus {
+  const explicit = select(p, "Billing Status").toLowerCase();
+  if (explicit === "paid") return "paid";
+  if (explicit === "invoiced") return "invoiced";
+  if (explicit === "unbilled") return "unbilled";
+  return textOrNull(p, "Invoice Number") ? "invoiced" : "unbilled";
+}
+
+export function buildBillingUpdateProperties(
+  status: BillingStatus,
+  invoiceNumber?: string | null,
+  now = new Date().toISOString()
+): Record<string, unknown> {
+  const title = status === "paid" ? "Paid" : status === "invoiced" ? "Invoiced" : "Unbilled";
+  const props: Record<string, unknown> = {
+    "Billing Status": { select: { name: title } },
+  };
+  if (status === "unbilled") {
+    props["Invoice Number"] = { rich_text: [] };
+    props["Invoiced At"] = { date: null };
+    props["Paid At"] = { date: null };
+  } else {
+    if (invoiceNumber) props["Invoice Number"] = { rich_text: [{ text: { content: invoiceNumber } }] };
+    props["Invoiced At"] = { date: { start: now } };
+    props["Paid At"] = { date: status === "paid" ? { start: now } : null };
+  }
+  return props;
+}
+
+export async function updateSessionBilling(
+  sessionIds: string[],
+  status: BillingStatus,
+  invoiceNumber?: string | null
+): Promise<void> {
+  const client = new Client({ auth: requireEnv("NOTION_TOKEN") });
+  const now = new Date().toISOString();
+  await Promise.all(
+    sessionIds.map((page_id) =>
+      client.pages.update({
+        page_id,
+        properties: buildBillingUpdateProperties(status, invoiceNumber, now) as any,
+      } as any)
+    )
+  );
+}
+
 /* ---------- fetch ---------- */
 
 function requireEnv(name: string): string {
@@ -239,6 +292,7 @@ export async function fetchPayload(): Promise<Payload> {
   const hours: Session[] = hoursRows.map((row) => {
     const p = row.properties as Props;
     return {
+      id: row.id,
       url: row.url,
       date: sessionDate(p),
       sid: text(p, "Session ID"),
@@ -249,6 +303,10 @@ export async function fetchPayload(): Promise<Payload> {
       rate: num(p, "Hourly Rate") ?? 0,
       billable: bool(p, "Billable"),
       status: select(p, "Billing Status"),
+      billingStatus: readBillingStatus(p),
+      invoiceNumber: textOrNull(p, "Invoice Number"),
+      invoicedAt: dateStart(p, "Invoiced At") || null,
+      paidAt: p["Paid At"]?.date?.start ?? null,
       location: textOrNull(p, "Location"),
       work: relationIds(p, "Related Work Done"),
       notes: textOrNull(p, "Notes"),
@@ -374,7 +432,7 @@ export function buildSessionProperties(
     "Total Hours": { number: input.hours },
     "Hourly Rate": { number: HOURLY_RATE },
     Billable: { checkbox: true },
-    "Billing Status": { select: { name: "Draft" } },
+    "Billing Status": { select: { name: "Unbilled" } },
     Location: { rich_text: [{ text: { content: input.location } }] },
     Client: { relation: [{ id: clientPageId }] },
   };

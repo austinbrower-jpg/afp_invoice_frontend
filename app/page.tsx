@@ -79,6 +79,7 @@ export default function Page() {
   const [round, setRound] = useState(0);
   const [showall, setShowall] = useState(false);
   const [showsid, setShowsid] = useState(true);
+  const [statusFilter, setStatusFilter] = useState<"unbilled" | "invoiced" | "paid" | "all">("unbilled");
 
   // Client-resolved today, the same pattern the dashboard uses: server and client can
   // disagree on the date near midnight, so this waits for the client clock after mount
@@ -123,13 +124,9 @@ export default function Page() {
 
   const rows = data?.hours ?? [];
   const visible = useMemo(
-    () => rows.filter((r) => inRange(r, from, to) && eligible(r, showall)),
-    [rows, from, to, showall]
+    () => rows.filter((r) => inRange(r, from, to) && eligible(r, showall) && (statusFilter === "all" || r.billingStatus === statusFilter)),
+    [rows, from, to, showall, statusFilter]
   );
-  // Only rows that are picked AND still in range AND still eligible under the current showall
-  // are billed. Without the eligibility re-check, checking a superseded row with "Show
-  // non-billable and superseded" on, then turning it off, would hide the row while it stayed
-  // on the invoice and in the total, with no way to see or uncheck it. See docs/06-ui-spec.md.
   const selected = useMemo(
     () =>
       rows
@@ -138,18 +135,26 @@ export default function Page() {
     [rows, picked, from, to, showall]
   );
 
-  const toggle = (url: string) =>
+  // Only unbilled rows become invoice line items. Invoiced and paid rows may still be selected
+  // for status repair, but they cannot ride stale local selection into a new invoice.
+  const invoiceSelected = useMemo(
+    () => selected.filter((r) => r.billingStatus === "unbilled"),
+    [selected]
+  );
+
+  const toggle = (url: string) => {
     setPicked((prev) => {
       const next = new Set(prev);
       if (next.has(url)) next.delete(url);
       else next.add(url);
       return next;
     });
+  };
 
   const preset = (p: string) => {
     if (!data) return;
     const today = todayISO();
-    if (p === "unbilled") setRange(unbilledStart(data, today), today);
+    if (p === "unbilled") { setStatusFilter("unbilled"); setRange(unbilledStart(data, today), today); }
     if (p === "week") setRange(addDays(today, -6), today);
     if (p === "month") setRange(today.slice(0, 8) + "01", today);
     if (p === "all") setRange(today.slice(0, 4) + "-01-01", today);
@@ -158,15 +163,53 @@ export default function Page() {
   const syncDue = (t: string, d: string) =>
     setDuedate(t === "Net 15" ? addDays(d, 15) : t === "Net 30" ? addDays(d, 30) : d);
 
+
+  const updateBillingStatus = useCallback(async (status: "unbilled" | "invoiced" | "paid") => {
+    if (!selected.length) return;
+    const hours = selected.reduce((sum, r) => sum + roundHours(r.hours, round), 0);
+    const amount = selected.reduce((sum, r) => sum + roundHours(r.hours, round) * r.rate, 0);
+    const invoiceNumbers = [...new Set(selected.map((r) => r.invoiceNumber).filter(Boolean))].join(", ");
+    if (status === "paid" && selected.length > 1) {
+      const ok = window.confirm(
+        `Mark ${selected.length} sessions as Paid?\nTotal hours: ${hours.toFixed(2)}\nTotal amount: ${money(amount)}${invoiceNumbers ? `\nInvoice: ${invoiceNumbers}` : ""}`
+      );
+      if (!ok) return;
+    }
+    await fetch("/api/billing/status", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        sessionIds: selected.map((r) => r.id),
+        status,
+        invoiceNumber: status === "unbilled" ? undefined : invno,
+      }),
+    });
+    refresh();
+    setPicked(new Set());
+  }, [selected, round, invno, refresh]);
+
+  const markCurrentInvoice = useCallback(async (status: "invoiced" | "paid") => {
+    if (!data || !invno) return;
+    const invoiceRows = data.hours.filter((r) => r.invoiceNumber === invno || picked.has(r.url));
+    if (!invoiceRows.length) return;
+    await fetch("/api/billing/status", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ sessionIds: invoiceRows.map((r) => r.id), status, invoiceNumber: invno }),
+    });
+    refresh();
+    setPicked(new Set());
+  }, [data, invno, picked, refresh]);
+
   /* ---------- derived ---------- */
   const lines = useMemo(
     () =>
-      selected.map((r) => ({
+      invoiceSelected.map((r) => ({
         ...r,
         billed: roundHours(r.hours, round),
         amount: roundHours(r.hours, round) * r.rate,
       })),
-    [selected, round]
+    [invoiceSelected, round]
   );
   const totalHours = lines.reduce((s, l) => s + l.billed, 0);
   const totalAmt = lines.reduce((s, l) => s + l.amount, 0);
@@ -216,7 +259,7 @@ export default function Page() {
       .sort((a, b) => a.key.localeCompare(b.key));
   }, [data, lines, mode]);
 
-  const flags = useMemo(() => (data ? buildFlags(data, selected) : []), [data, selected]);
+  const flags = useMemo(() => (data ? buildFlags(data, invoiceSelected) : []), [data, invoiceSelected]);
 
   const weeks = useMemo(
     () => (data && today2 ? weeklyEarnings(data, today2, 6) : []),
@@ -263,8 +306,8 @@ export default function Page() {
     return { value: h, fillPercent: (h / 60) * 100, ariaLabel: `${h.toFixed(1)} of 60 hours this month`, ...meta };
   }, [settings.dialMetric, data, today2]);
 
-  const runnerHours = selected.reduce((s, r) => s + roundHours(r.hours, round), 0);
-  const runnerAmt = selected.reduce((s, r) => s + roundHours(r.hours, round) * r.rate, 0);
+  const runnerHours = invoiceSelected.reduce((s, r) => s + roundHours(r.hours, round), 0);
+  const runnerAmt = invoiceSelected.reduce((s, r) => s + roundHours(r.hours, round) * r.rate, 0);
 
   // The number you are about to charge someone is the point of the tool. Let it move.
   // Console only: the paper stays inert, because it is a document, not an instrument.
@@ -290,6 +333,9 @@ export default function Page() {
     return () => window.removeEventListener("afterprint", done);
   }, []);
 
+  // Browsers do not expose whether the native print dialog was saved or cancelled. Save PDF
+  // therefore only opens the prepared print flow; billing status changes happen through the
+  // explicit Finalize/Mark controls after the user confirms the invoice should be recorded.
   const savePdf = useCallback(async () => {
     // Nothing selected means the paper is showing the "pick sessions" prompt, not an invoice.
     // Printing here produced a blank page. Refuse rather than save an empty PDF; the button is
@@ -338,6 +384,12 @@ export default function Page() {
             <button className="chip" onClick={() => preset("month")}>This month</button>
             <button className="chip" onClick={() => preset("all")}>All</button>
           </div>
+          <select aria-label="Billing status filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)}>
+            <option value="unbilled">Unbilled</option>
+            <option value="invoiced">Invoiced</option>
+            <option value="paid">Paid</option>
+            <option value="all">All</option>
+          </select>
         </div>
         <ClockControl
           activeClock={data?.activeClock ?? null}
@@ -374,6 +426,11 @@ export default function Page() {
           </div>
 
           <h2>Sessions in range</h2>
+          <div className="chips">
+            <button className="chip" onClick={() => updateBillingStatus("unbilled")} disabled={!selected.length}>Mark as Unbilled</button>
+            <button className="chip" onClick={() => updateBillingStatus("invoiced")} disabled={!selected.length}>Mark as Invoiced</button>
+            <button className="chip" onClick={() => updateBillingStatus("paid")} disabled={!selected.length}>Mark as Paid</button>
+          </div>
           <SessionManifest days={days} visible={visible} picked={picked} onToggle={toggle} />
 
           <div className="runner">
@@ -401,8 +458,13 @@ export default function Page() {
         </aside>
 
         <main className="paperstage">
+          <div className="chips">
+            <button className="chip" onClick={() => updateBillingStatus("invoiced")} disabled={!invoiceSelected.length}>Finalize Invoice</button>
+            <button className="chip" onClick={() => markCurrentInvoice("paid")}>Mark Invoice Paid</button>
+            <button className="chip" onClick={() => markCurrentInvoice("invoiced")}>Change Invoice back to Invoiced</button>
+          </div>
           <InvoiceSummary
-            sessions={selected.length}
+            sessions={invoiceSelected.length}
             amount={runnerAmt}
             onBuild={() => setLayout("invoice")}
           />

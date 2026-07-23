@@ -26,7 +26,7 @@ export default function SessionManifest({
               </div>
               {dayRows.map((r) => (
                 <label
-                  className={`sess ${picked.has(r.url) ? "on" : ""} ${isTerminal(r.status) ? "locked" : ""}`}
+                  className={`sess ${picked.has(r.url) ? "on" : ""} ${isTerminal(r) ? "locked" : ""} ${r.billingStatus === "paid" ? "paid" : ""}`}
                   key={r.url}
                 >
                   <input type="checkbox" checked={picked.has(r.url)} onChange={() => onToggle(r.url)} />
@@ -36,8 +36,8 @@ export default function SessionManifest({
                       <span style={{ flexBasis: "100%" }}>
                         {r.start} – {r.end}{r.location ? " · " + r.location : ""}
                       </span>
-                      <StatusLed status={r.status} />
-                      <span className="statuslabel">{r.status}</span>
+                      <StatusLed status={r.billingStatus} />
+                      <span className="statuslabel">{r.billingStatus}</span>
                       {!r.billable && <span className="nobill">· non-billable</span>}
                     </span>
                   </span>

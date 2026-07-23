@@ -16,6 +16,9 @@ const LED_CLASS: Record<string, string> = {
   "Ready to Invoice": "led-ready",
   Invoiced: "led-invoiced",
   Paid: "led-paid",
+  unbilled: "led-ready",
+  invoiced: "led-invoiced",
+  paid: "led-paid",
   Superseded: "led-superseded",
 };
 
